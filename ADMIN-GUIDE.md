@@ -102,7 +102,7 @@ When you change your schedule template, regenerate the slots:
 
 ```bash
 # Connect to your database and run the seed script
-psql -U postgres -d matboss_online -f sql/seed.sql
+psql -U postgres -h localhost -p 4040 -d matboss_online -f sql/seed.sql
 ```
 
 This will:
@@ -111,6 +111,11 @@ This will:
 - Leave existing bookings untouched
 
 **Safe to run anytime** — it only deletes un-booked future slots.
+
+Verify the result:
+```bash
+psql -U postgres -h localhost -p 4040 -d matboss_online -f sql/verify.sql
+```
 
 ---
 
@@ -143,8 +148,8 @@ Set these in **Netlify > Site Settings > Environment Variables**:
 
 | Variable      | Value                        |
 |---------------|------------------------------|
-| `DB_HOST`     | Your PostgreSQL host         |
-| `DB_PORT`     | `5432`                       |
+| `DB_HOST`     | `localhost` for local setup  |
+| `DB_PORT`     | `4040` for this local setup  |
 | `DB_NAME`     | `matboss_online`             |
 | `DB_USER`     | `postgres`                   |
 | `DB_PASSWORD` | Your database password       |

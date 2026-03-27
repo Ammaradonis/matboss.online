@@ -39,7 +39,7 @@ export default function BookingModal({ slot, timezone, onClose, onComplete }: Pr
 
     setSubmitting(true);
     try {
-      const confirmation = await bookSlot(slot.id, form, timezone);
+      const confirmation = await bookSlot(slot, form, timezone);
       onComplete(confirmation);
     } catch (err: any) {
       setError(err.message || 'Booking failed. Please try again.');

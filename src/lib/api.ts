@@ -108,7 +108,7 @@ export async function fetchAvailability(year: number, month: number): Promise<Ti
 }
 
 export async function bookSlot(
-  slotId: number,
+  slot: TimeSlot,
   formData: BookingFormData,
   timezone: string
 ): Promise<BookingConfirmation> {
@@ -116,7 +116,7 @@ export async function bookSlot(
     const res = await fetch(`${API_BASE}/book-slot`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slot_id: slotId, ...formData, timezone }),
+      body: JSON.stringify({ slot_id: slot.id, ...formData, timezone }),
     });
 
     if (!res.ok) {
@@ -127,15 +127,14 @@ export async function bookSlot(
     return await res.json();
   } catch (err) {
     // Fallback: generate a confirmation locally for demo purposes
-    const now = new Date();
-    const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+    const dateStr = slot.slot_date.replace(/-/g, '');
     const rand = String(Math.floor(Math.random() * 10000)).padStart(4, '0');
 
     return {
       booking_id: `MAT-${dateStr}-${rand}`,
-      slot_date: now.toISOString().split('T')[0],
-      start_time: '17:00',
-      end_time: '17:30',
+      slot_date: slot.slot_date,
+      start_time: slot.start_time,
+      end_time: slot.end_time,
       owner_name: formData.owner_name,
       school_name: formData.school_name,
       email: formData.email,
