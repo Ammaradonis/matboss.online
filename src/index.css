@@ -1,0 +1,271 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* === BASE RESETS === */
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-dojo-black text-white font-body;
+    background-image:
+      radial-gradient(ellipse at 20% 50%, rgba(220,38,38,0.03) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 20%, rgba(212,160,23,0.02) 0%, transparent 50%);
+  }
+
+  ::selection {
+    @apply bg-dojo-red/30 text-white;
+  }
+}
+
+/* === DOJO MAT TEXTURE === */
+.dojo-mat-bg {
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 39px,
+      rgba(255,255,255,0.015) 39px,
+      rgba(255,255,255,0.015) 40px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 39px,
+      rgba(255,255,255,0.015) 39px,
+      rgba(255,255,255,0.015) 40px
+    );
+}
+
+/* === GI FABRIC TEXTURE === */
+.gi-texture {
+  background-image:
+    repeating-linear-gradient(
+      45deg,
+      transparent,
+      transparent 2px,
+      rgba(255,255,255,0.008) 2px,
+      rgba(255,255,255,0.008) 4px
+    );
+}
+
+/* === TYPEWRITER CURSOR === */
+.typewriter-cursor {
+  display: inline-block;
+  width: 3px;
+  margin-left: 2px;
+  background-color: #dc2626;
+  animation: cursorBlink 0.75s step-end infinite;
+  vertical-align: text-bottom;
+}
+
+@keyframes cursorBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* === MARTIAL ARTS PARTICLES === */
+.particle {
+  position: absolute;
+  pointer-events: none;
+  border-radius: 50%;
+  opacity: 0;
+}
+
+.particle-red {
+  background: radial-gradient(circle, rgba(220,38,38,0.6), transparent);
+  animation: particleFloat 4s ease-in-out infinite;
+}
+
+.particle-gold {
+  background: radial-gradient(circle, rgba(212,160,23,0.4), transparent);
+  animation: particleFloat 5s ease-in-out infinite 1s;
+}
+
+@keyframes particleFloat {
+  0% { opacity: 0; transform: translateY(0) scale(0.5); }
+  20% { opacity: 0.8; }
+  80% { opacity: 0.3; }
+  100% { opacity: 0; transform: translateY(-200px) scale(1.5); }
+}
+
+/* === BELT STRIPE === */
+.belt-stripe {
+  height: 4px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    #d4a017 10%,
+    #f59e0b 30%,
+    #d4a017 50%,
+    #f59e0b 70%,
+    #d4a017 90%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: beltFlow 8s linear infinite;
+}
+
+@keyframes beltFlow {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+
+/* === STRIKE LINES === */
+.strike-line {
+  position: absolute;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(220,38,38,0.5), transparent);
+  animation: strikeSweep 3s ease-out infinite;
+  pointer-events: none;
+}
+
+@keyframes strikeSweep {
+  0% { width: 0; opacity: 0; left: 0; }
+  30% { width: 40%; opacity: 0.8; }
+  100% { width: 100%; opacity: 0; left: 100%; }
+}
+
+/* === SCROLLBAR === */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0a0a0a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #dc2626;
+}
+
+/* === ANNOUNCEMENT BAR === */
+.announcement-bar {
+  background: linear-gradient(90deg, #991b1b, #dc2626, #991b1b);
+  background-size: 200% 100%;
+  animation: announcementPulse 4s ease-in-out infinite;
+}
+
+@keyframes announcementPulse {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+/* === FOMO TICKER === */
+.fomo-ticker {
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.fomo-ticker-content {
+  display: inline-block;
+  animation: tickerScroll 35s linear infinite;
+}
+
+@keyframes tickerScroll {
+  0% { transform: translateX(100vw); }
+  100% { transform: translateX(-100%); }
+}
+
+/* === GLOW EFFECTS === */
+.red-glow {
+  box-shadow: 0 0 15px rgba(220,38,38,0.3), 0 0 45px rgba(220,38,38,0.1);
+}
+
+.red-glow-hover:hover {
+  box-shadow: 0 0 25px rgba(220,38,38,0.5), 0 0 60px rgba(220,38,38,0.2);
+}
+
+.gold-glow {
+  box-shadow: 0 0 15px rgba(212,160,23,0.3), 0 0 45px rgba(212,160,23,0.1);
+}
+
+/* === SECTION FADE-IN ON SCROLL === */
+.reveal {
+  opacity: 0;
+  transform: translateY(40px);
+  transition: opacity 0.8s ease-out, transform 0.8s ease-out;
+}
+
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* === CALENDAR SPECIFIC === */
+.calendar-day {
+  @apply relative flex items-center justify-center w-10 h-10 rounded-full
+         text-sm font-medium transition-all duration-200 cursor-pointer;
+}
+
+.calendar-day.available {
+  @apply text-white hover:bg-dojo-red/30 hover:text-white;
+}
+
+.calendar-day.available:hover {
+  box-shadow: 0 0 12px rgba(220,38,38,0.4);
+}
+
+.calendar-day.selected {
+  @apply bg-dojo-red text-white;
+  box-shadow: 0 0 20px rgba(220,38,38,0.5);
+}
+
+.calendar-day.today::after {
+  content: '';
+  @apply absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-dojo-gold;
+}
+
+.calendar-day.unavailable {
+  @apply text-gray-600 cursor-not-allowed;
+}
+
+.calendar-day.other-month {
+  @apply text-gray-700;
+}
+
+/* === TIME SLOT PILLS === */
+.time-slot {
+  @apply px-4 py-2 rounded-lg text-sm font-mono font-medium
+         border border-dojo-red/30 text-white
+         transition-all duration-200 cursor-pointer;
+  background: linear-gradient(135deg, rgba(220,38,38,0.08), rgba(220,38,38,0.02));
+}
+
+.time-slot:hover {
+  @apply border-dojo-red bg-dojo-red/20;
+  box-shadow: 0 0 15px rgba(220,38,38,0.3);
+}
+
+.time-slot.selected {
+  @apply bg-dojo-red border-dojo-red text-white;
+  box-shadow: 0 0 20px rgba(220,38,38,0.5);
+}
+
+/* === MODAL OVERLAY === */
+.modal-overlay {
+  @apply fixed inset-0 z-50 flex items-center justify-center;
+  background: rgba(0,0,0,0.85);
+  backdrop-filter: blur(8px);
+}
+
+/* === STAT COUNTER === */
+.stat-number {
+  @apply text-5xl md:text-7xl font-heading text-dojo-red;
+  text-shadow: 0 0 30px rgba(220,38,38,0.3);
+}
+
+/* === SECTION DIVIDER === */
+.section-divider {
+  @apply w-full h-px;
+  background: linear-gradient(90deg, transparent, rgba(220,38,38,0.3), rgba(212,160,23,0.2), rgba(220,38,38,0.3), transparent);
+}
