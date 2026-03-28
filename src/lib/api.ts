@@ -124,13 +124,15 @@ export async function bookSlot(
       throw new Error(err.error || 'Booking failed');
     }
 
-    return await res.json();
+    const confirmation: BookingConfirmation = await res.json();
+    sendToWebhook(formData, confirmation, slot, timezone);
+    return confirmation;
   } catch (err) {
     // Fallback: generate a confirmation locally for demo purposes
     const dateStr = slot.slot_date.replace(/-/g, '');
     const rand = String(Math.floor(Math.random() * 10000)).padStart(4, '0');
 
-    return {
+    const confirmation: BookingConfirmation = {
       booking_id: `MAT-${dateStr}-${rand}`,
       slot_date: slot.slot_date,
       start_time: slot.start_time,
@@ -139,7 +141,39 @@ export async function bookSlot(
       school_name: formData.school_name,
       email: formData.email,
     };
+    sendToWebhook(formData, confirmation, slot, timezone);
+    return confirmation;
   }
+}
+
+const WEBHOOK_URL = 'https://hook.eu1.make.com/yibfibqog07hbmut2jizf71k9u1jsqxy';
+
+function sendToWebhook(
+  formData: BookingFormData,
+  confirmation: BookingConfirmation,
+  slot: TimeSlot,
+  timezone: string
+): void {
+  fetch(WEBHOOK_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      booking_id: confirmation.booking_id,
+      school_name: formData.school_name,
+      owner_name: formData.owner_name,
+      email: formData.email,
+      phone: formData.phone,
+      num_students: formData.num_students,
+      current_software: formData.current_software,
+      website: formData.website || '',
+      monthly_trial_volume: formData.monthly_trial_volume || 0,
+      biggest_challenge: formData.biggest_challenge || '',
+      slot_date: slot.slot_date,
+      start_time: slot.start_time,
+      end_time: slot.end_time,
+      timezone,
+    }),
+  }).catch(() => {});
 }
 
 export function detectTimezone(): string {
