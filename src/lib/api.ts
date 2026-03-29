@@ -149,9 +149,7 @@ export async function bookSlot(
 const WEBHOOK_URL = 'https://hook.eu1.make.com/yibfibqog07hbmut2jizf71k9u1jsqxy';
 
 function toSanDiegoTimestamp(dateStr: string, timeStr: string): string {
-  // Build an ISO-like string interpreted as San Diego local time
-  // Format: "2026-03-29T17:00:00 America/Los_Angeles"
-  return `${dateStr}T${timeStr}:00 ${SD_TIMEZONE}`;
+  return `${dateStr}T${timeStr}:00`;
 }
 
 function sendToWebhook(
@@ -176,7 +174,7 @@ function sendToWebhook(
       slot_date: toSanDiegoTimestamp(slot.slot_date, '00:00'),
       start_time: toSanDiegoTimestamp(slot.slot_date, slot.start_time),
       end_time: toSanDiegoTimestamp(slot.slot_date, slot.end_time),
-      timezone: SD_TIMEZONE,
+      timezone: 'Pacific',
     }),
   }).catch(() => {});
 }
