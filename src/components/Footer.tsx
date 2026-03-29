@@ -39,8 +39,13 @@ export default function Footer() {
             </h4>
             <ul className="space-y-2 text-xs text-gray-500">
               <li>
-                <a href="mailto:alkhederammar147@gmail.com" className="hover:text-white transition-colors">
-                  alkhederammar147@gmail.com
+                <a href="mailto:info@matboss.online" className="hover:text-white transition-colors">
+                  info@matboss.online
+                </a>
+              </li>
+              <li>
+                <a href="tel:+16197529618" className="hover:text-white transition-colors">
+                  (619) 752-9618
                 </a>
               </li>
               <li>San Diego, California</li>
@@ -59,8 +64,8 @@ export default function Footer() {
             <strong className="text-gray-400">Have a Booking ID?</strong> Your booking reference
             follows the format <span className="font-mono text-dojo-gold">MAT-YYYYMMDD-XXXX</span>.
             Keep this ID for rescheduling or reference. Contact us at{' '}
-            <a href="mailto:alkhederammar147@gmail.com" className="text-dojo-red hover:underline">
-              alkhederammar147@gmail.com
+            <a href="mailto:info@matboss.online" className="text-dojo-red hover:underline">
+              info@matboss.online
             </a>{' '}
             with your Booking ID for any changes.
           </p>
@@ -69,7 +74,7 @@ export default function Footer() {
         {/* Bottom */}
         <div className="flex flex-col md:flex-row items-center justify-between gap-4 pt-4 border-t border-white/5">
           <p className="text-[10px] text-gray-600">
-            &copy; {year} MatBoss. All rights reserved. San Diego, CA.
+            &copy; {year} MatBoss - Stop the Leaks. All rights reserved. San Diego, CA.
           </p>
           <p className="text-[10px] text-gray-700">
             Built for San Diego martial arts school owners who refuse to leave money on the mat.
