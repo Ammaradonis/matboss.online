@@ -152,6 +152,26 @@ function toSanDiegoTimestamp(dateStr: string, timeStr: string): string {
   return `${dateStr}T${timeStr}:00`;
 }
 
+function formatHumanDateTime(dateStr: string, timeStr: string): string {
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  const period = hours >= 12 ? 'PM' : 'AM';
+  const h = hours % 12 || 12;
+  const time = minutes === 0 ? `${h} ${period}` : `${h}:${String(minutes).padStart(2, '0')} ${period}`;
+  const date = new Date(dateStr + 'T12:00:00');
+  const day = date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  return `${day} at ${time}`;
+}
+
+function toMakeTimestamp(dateStr: string, timeStr: string): string {
+  const date = new Date(dateStr + 'T12:00:00Z');
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: SD_TIMEZONE,
+    timeZoneName: 'longOffset',
+  }).formatToParts(date);
+  const offset = parts.find(p => p.type === 'timeZoneName')?.value.replace('GMT', '') || '-07:00';
+  return `${dateStr}T${timeStr}:00${offset}`;
+}
+
 function sendToWebhook(
   formData: BookingFormData,
   confirmation: BookingConfirmation,
@@ -175,6 +195,8 @@ function sendToWebhook(
       start_time: toSanDiegoTimestamp(slot.slot_date, slot.start_time),
       end_time: toSanDiegoTimestamp(slot.slot_date, slot.end_time),
       timezone: 'Pacific',
+      'date-time': formatHumanDateTime(slot.slot_date, slot.start_time),
+      Make_timestamp: toMakeTimestamp(slot.slot_date, slot.start_time),
     }),
   }).catch(() => {});
 }
