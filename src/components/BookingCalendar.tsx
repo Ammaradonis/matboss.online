@@ -239,7 +239,7 @@ export default function BookingCalendar() {
             <path strokeLinecap="round" strokeWidth="1.5" d="M12 6v6l4 2" />
           </svg>
           <span>
-            {timezone.replace(/_/g, ' ')} ({new Date().toLocaleTimeString('en-US', {
+            San Diego, CA — Pacific Time ({new Date().toLocaleTimeString('en-US', {
               timeZone: timezone,
               hour: '2-digit',
               minute: '2-digit',

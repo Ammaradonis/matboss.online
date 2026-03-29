@@ -125,7 +125,7 @@ export async function bookSlot(
     }
 
     const confirmation: BookingConfirmation = await res.json();
-    sendToWebhook(formData, confirmation, slot, timezone);
+    sendToWebhook(formData, confirmation, slot);
     return confirmation;
   } catch (err) {
     // Fallback: generate a confirmation locally for demo purposes
@@ -141,18 +141,23 @@ export async function bookSlot(
       school_name: formData.school_name,
       email: formData.email,
     };
-    sendToWebhook(formData, confirmation, slot, timezone);
+    sendToWebhook(formData, confirmation, slot);
     return confirmation;
   }
 }
 
 const WEBHOOK_URL = 'https://hook.eu1.make.com/yibfibqog07hbmut2jizf71k9u1jsqxy';
 
+function toSanDiegoTimestamp(dateStr: string, timeStr: string): string {
+  // Build an ISO-like string interpreted as San Diego local time
+  // Format: "2026-03-29T17:00:00 America/Los_Angeles"
+  return `${dateStr}T${timeStr}:00 ${SD_TIMEZONE}`;
+}
+
 function sendToWebhook(
   formData: BookingFormData,
   confirmation: BookingConfirmation,
   slot: TimeSlot,
-  timezone: string
 ): void {
   fetch(WEBHOOK_URL, {
     method: 'POST',
@@ -168,20 +173,18 @@ function sendToWebhook(
       website: formData.website || '',
       monthly_trial_volume: formData.monthly_trial_volume || 0,
       biggest_challenge: formData.biggest_challenge || '',
-      slot_date: slot.slot_date,
-      start_time: slot.start_time,
-      end_time: slot.end_time,
-      timezone,
+      slot_date: toSanDiegoTimestamp(slot.slot_date, '00:00'),
+      start_time: toSanDiegoTimestamp(slot.slot_date, slot.start_time),
+      end_time: toSanDiegoTimestamp(slot.slot_date, slot.end_time),
+      timezone: SD_TIMEZONE,
     }),
   }).catch(() => {});
 }
 
+export const SD_TIMEZONE = 'America/Los_Angeles';
+
 export function detectTimezone(): string {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone;
-  } catch {
-    return 'America/Los_Angeles';
-  }
+  return SD_TIMEZONE;
 }
 
 export function formatTimeForDisplay(time24: string, timezone: string): string {
