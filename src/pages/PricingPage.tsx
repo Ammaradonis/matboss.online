@@ -1,4 +1,5 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import PricingAnnouncementBar from '../components/pricing/PricingAnnouncementBar';
 import PricingTicker from '../components/pricing/PricingTicker';
 import SectionClassified from '../components/pricing/SectionClassified';
@@ -10,9 +11,21 @@ import SectionCheckout from '../components/pricing/SectionCheckout';
 import Footer from '../components/Footer';
 
 export default function PricingPage() {
+  const [searchParams] = useSearchParams();
+  const [redirectSuccess] = useState(
+    () => searchParams.get('payment_status') === 'success',
+  );
+
   useEffect(() => {
-    window.scrollTo(0, 0);
-  }, []);
+    if (redirectSuccess) {
+      // Landed here after Stripe redirect — scroll to checkout section
+      setTimeout(() => {
+        document.getElementById('checkout')?.scrollIntoView({ behavior: 'smooth' });
+      }, 300);
+    } else {
+      window.scrollTo(0, 0);
+    }
+  }, [redirectSuccess]);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -50,7 +63,7 @@ export default function PricingPage() {
       <SectionDetonation />
 
       <div className="section-divider" />
-      <SectionCheckout />
+      <SectionCheckout redirectSuccess={redirectSuccess} />
 
       <div className="section-divider" />
       <Footer />

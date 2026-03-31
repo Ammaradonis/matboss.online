@@ -1,5 +1,6 @@
 import type { Context } from '@netlify/functions';
 import pool from './db';
+import { isSlotBookable, SLOT_POLICY_ERROR } from '../../src/lib/bookingRules';
 
 export default async (req: Request, _context: Context) => {
   if (req.method !== 'POST') {
@@ -58,6 +59,14 @@ export default async (req: Request, _context: Context) => {
         await client.query('ROLLBACK');
         return new Response(
           JSON.stringify({ error: 'Slot is no longer available. Please choose another time.' }),
+          { status: 409, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (!isSlotBookable(slot)) {
+        await client.query('ROLLBACK');
+        return new Response(
+          JSON.stringify({ error: SLOT_POLICY_ERROR }),
           { status: 409, headers: { 'Content-Type': 'application/json' } }
         );
       }

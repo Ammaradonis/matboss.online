@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import type { TimeSlot, CalendarDay } from '../types';
 import { fetchAvailability, formatTimeForDisplay, detectTimezone } from '../lib/api';
+import { filterBookableSlots, getSanDiegoDateObject } from '../lib/bookingRules';
 import BookingModal from './BookingModal';
 import BookingSuccess from './BookingSuccess';
 import type { BookingConfirmation } from '../types';
@@ -12,13 +13,14 @@ const MONTH_NAMES = [
 ];
 
 export default function BookingCalendar() {
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [currentDate, setCurrentDate] = useState(() => getSanDiegoDateObject());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
   const [slots, setSlots] = useState<TimeSlot[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [confirmation, setConfirmation] = useState<BookingConfirmation | null>(null);
+  const [now, setNow] = useState(() => new Date());
   const timezone = useMemo(() => detectTimezone(), []);
 
   const year = currentDate.getFullYear();
@@ -34,6 +36,26 @@ export default function BookingCalendar() {
   useEffect(() => {
     loadSlots();
   }, [loadSlots]);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setNow(new Date());
+    }, 30_000);
+
+    return () => window.clearInterval(intervalId);
+  }, []);
+
+  const bookableSlots = useMemo(() => filterBookableSlots(slots, now), [slots, now]);
+
+  useEffect(() => {
+    if (!selectedSlot) return;
+
+    const stillBookable = bookableSlots.some((slot) => slot.id === selectedSlot.id);
+    if (stillBookable) return;
+
+    setSelectedSlot(null);
+    setShowModal(false);
+  }, [bookableSlots, selectedSlot]);
 
   // Build calendar grid
   const calendarDays: CalendarDay[] = useMemo(() => {
@@ -59,14 +81,14 @@ export default function BookingCalendar() {
       });
     }
 
-    const today = new Date();
+    const today = getSanDiegoDateObject(now);
     today.setHours(0, 0, 0, 0);
 
     // Current month days
     for (let day = 1; day <= lastDay.getDate(); day++) {
       const d = new Date(year, month, day);
       const dateStr = formatDateStr(d);
-      const daySlots = slots.filter((s) => s.slot_date === dateStr && !s.is_booked);
+      const daySlots = bookableSlots.filter((s) => s.slot_date === dateStr);
       const isToday = d.getTime() === today.getTime();
 
       days.push({
@@ -94,23 +116,23 @@ export default function BookingCalendar() {
     }
 
     return days;
-  }, [year, month, slots]);
+  }, [year, month, bookableSlots, now]);
 
   const selectedDateSlots = useMemo(() => {
     if (!selectedDate) return [];
-    return slots.filter((s) => s.slot_date === selectedDate && !s.is_booked);
-  }, [selectedDate, slots]);
+    return bookableSlots.filter((s) => s.slot_date === selectedDate);
+  }, [selectedDate, bookableSlots]);
 
   function formatDateStr(d: Date): string {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
 
   function navigateMonth(delta: number) {
-    const maxDate = new Date();
+    const maxDate = getSanDiegoDateObject(now);
     maxDate.setDate(maxDate.getDate() + 91);
 
     const newDate = new Date(year, month + delta, 1);
-    const today = new Date();
+    const today = getSanDiegoDateObject(now);
     today.setDate(1);
     today.setHours(0, 0, 0, 0);
 
@@ -239,7 +261,7 @@ export default function BookingCalendar() {
             <path strokeLinecap="round" strokeWidth="1.5" d="M12 6v6l4 2" />
           </svg>
           <span>
-            San Diego, CA — Pacific Time ({new Date().toLocaleTimeString('en-US', {
+            San Diego, CA — Pacific Time ({now.toLocaleTimeString('en-US', {
               timeZone: timezone,
               hour: '2-digit',
               minute: '2-digit',

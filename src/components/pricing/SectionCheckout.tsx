@@ -1,4 +1,61 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements } from '@stripe/react-stripe-js';
+import type { Appearance } from '@stripe/stripe-js';
+import StripePaymentForm from './StripePaymentForm';
+
+const stripePromise = loadStripe(
+  'pk_test_51TFyG9Hzyp1GTXixZOsfMRGRduu7fIgebzEQWCq7TAqr1kdT6EOHqz8RvaVYsKHgeB8XNFu9KbFNUgHkYiD05eHZ00B03pcAQN',
+);
+
+const stripeAppearance: Appearance = {
+  theme: 'night',
+  variables: {
+    colorPrimary: '#dc2626',
+    colorBackground: '#1a1a1a',
+    colorText: '#ffffff',
+    colorTextSecondary: '#9ca3af',
+    colorTextPlaceholder: '#4b5563',
+    colorDanger: '#dc2626',
+    fontFamily: '"Inter", system-ui, sans-serif',
+    borderRadius: '12px',
+    spacingUnit: '4px',
+    fontSizeBase: '14px',
+  },
+  rules: {
+    '.Input': {
+      backgroundColor: '#1a1a1a',
+      border: '1px solid rgba(255,255,255,0.1)',
+      boxShadow: 'none',
+      padding: '12px 16px',
+    },
+    '.Input:focus': {
+      border: '1px solid #dc2626',
+      boxShadow: 'none',
+    },
+    '.Label': {
+      fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+      fontSize: '10px',
+      textTransform: 'uppercase',
+      letterSpacing: '0.1em',
+      color: '#6b7280',
+    },
+    '.Tab': {
+      backgroundColor: '#111111',
+      border: '1px solid rgba(255,255,255,0.05)',
+      color: '#9ca3af',
+    },
+    '.Tab--selected': {
+      backgroundColor: '#1a1a1a',
+      border: '1px solid #dc2626',
+      color: '#ffffff',
+    },
+    '.Tab:hover': {
+      backgroundColor: '#1a1a1a',
+      color: '#ffffff',
+    },
+  },
+};
 
 interface CheckoutFormData {
   school_name: string;
@@ -9,7 +66,11 @@ interface CheckoutFormData {
   current_software: string;
 }
 
-export default function SectionCheckout() {
+interface SectionCheckoutProps {
+  redirectSuccess?: boolean;
+}
+
+export default function SectionCheckout({ redirectSuccess = false }: SectionCheckoutProps) {
   const [formData, setFormData] = useState<CheckoutFormData>({
     school_name: '',
     owner_name: '',
@@ -18,8 +79,11 @@ export default function SectionCheckout() {
     num_students: '',
     current_software: '',
   });
-  const [showPayment, setShowPayment] = useState(false);
   const [errors, setErrors] = useState<Partial<CheckoutFormData>>({});
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [paymentSuccess, setPaymentSuccess] = useState(redirectSuccess);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -43,18 +107,86 @@ export default function SectionCheckout() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleCheckout = (e: React.FormEvent) => {
+  const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (validate()) {
-      setShowPayment(true);
+    if (!validate()) return;
+
+    setPaymentLoading(true);
+    setPaymentError(null);
+
+    try {
+      const res = await fetch('/.netlify/functions/create-payment-intent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          school_name: formData.school_name,
+          owner_name: formData.owner_name,
+          email: formData.email,
+          phone: formData.phone,
+          num_students: formData.num_students,
+          current_software: formData.current_software,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Payment setup failed' }));
+        throw new Error(err.error || 'Payment setup failed');
+      }
+
+      const { clientSecret: secret } = await res.json();
+      setClientSecret(secret);
+    } catch (err: any) {
+      setPaymentError(err.message || 'Something went wrong. Please try again.');
+    } finally {
+      setPaymentLoading(false);
     }
   };
+
+  const handlePaymentSuccess = useCallback(() => {
+    setPaymentSuccess(true);
+  }, []);
 
   const inputClass = (field: keyof CheckoutFormData) =>
     `w-full px-4 py-3 rounded-xl bg-dojo-carbon border text-white text-sm font-body
      placeholder-gray-600 focus:outline-none focus:border-dojo-red transition-colors
      ${errors[field] ? 'border-dojo-red/60' : 'border-white/10'}`;
 
+  // ── Success State ──
+  if (paymentSuccess) {
+    return (
+      <section id="checkout" className="py-20 md:py-28 px-4 relative overflow-hidden">
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[500px] bg-dojo-red/4 rounded-full blur-[150px]" />
+        </div>
+        <div className="max-w-lg mx-auto reveal">
+          <div className="bg-dojo-dark/80 border border-white/5 rounded-2xl p-8 text-center">
+            <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-green-500/10 border-2 border-green-500/40 flex items-center justify-center">
+              <svg className="w-8 h-8 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <h2 className="font-heading text-3xl md:text-4xl text-white tracking-wide mb-3">
+              Payment Confirmed
+            </h2>
+            <p className="text-gray-400 text-base leading-relaxed mb-2">
+              Welcome to MatBoss, <span className="text-white font-semibold">{formData.owner_name}</span>.
+            </p>
+            <p className="text-gray-500 text-sm leading-relaxed mb-6">
+              We'll begin system mapping for <span className="text-white">{formData.school_name}</span> within
+              24 hours. Check <span className="text-white">{formData.email}</span> for your receipt and
+              onboarding details.
+            </p>
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-dojo-carbon border border-white/5 text-xs text-gray-400">
+              <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+              Deployment pipeline activated
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  // ── Main Checkout ──
   return (
     <section id="checkout" className="py-20 md:py-28 px-4 relative overflow-hidden">
       <div className="absolute inset-0 pointer-events-none">
@@ -121,6 +253,7 @@ export default function SectionCheckout() {
                     onChange={handleChange}
                     placeholder="e.g. San Diego BJJ Academy"
                     className={inputClass('school_name')}
+                    disabled={!!clientSecret}
                   />
                   {errors.school_name && (
                     <p className="text-[10px] text-dojo-red mt-1">{errors.school_name}</p>
@@ -137,6 +270,7 @@ export default function SectionCheckout() {
                     onChange={handleChange}
                     placeholder="Full name"
                     className={inputClass('owner_name')}
+                    disabled={!!clientSecret}
                   />
                   {errors.owner_name && (
                     <p className="text-[10px] text-dojo-red mt-1">{errors.owner_name}</p>
@@ -156,6 +290,7 @@ export default function SectionCheckout() {
                     onChange={handleChange}
                     placeholder="you@yourdojo.com"
                     className={inputClass('email')}
+                    disabled={!!clientSecret}
                   />
                   {errors.email && (
                     <p className="text-[10px] text-dojo-red mt-1">{errors.email}</p>
@@ -172,6 +307,7 @@ export default function SectionCheckout() {
                     onChange={handleChange}
                     placeholder="(619) 000-0000"
                     className={inputClass('phone')}
+                    disabled={!!clientSecret}
                   />
                   {errors.phone && (
                     <p className="text-[10px] text-dojo-red mt-1">{errors.phone}</p>
@@ -191,6 +327,7 @@ export default function SectionCheckout() {
                     onChange={handleChange}
                     placeholder="e.g. 80"
                     className={inputClass('num_students')}
+                    disabled={!!clientSecret}
                   />
                   {errors.num_students && (
                     <p className="text-[10px] text-dojo-red mt-1">{errors.num_students}</p>
@@ -207,6 +344,7 @@ export default function SectionCheckout() {
                     onChange={handleChange}
                     placeholder="e.g. Zen Planner, MindBody"
                     className={inputClass('current_software')}
+                    disabled={!!clientSecret}
                   />
                   {errors.current_software && (
                     <p className="text-[10px] text-dojo-red mt-1">{errors.current_software}</p>
@@ -214,29 +352,43 @@ export default function SectionCheckout() {
                 </div>
               </div>
 
-              {/* Checkout button - only show when payment is NOT yet revealed */}
-              {!showPayment && (
+              {/* Error from payment intent creation */}
+              {paymentError && !clientSecret && (
+                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+                  {paymentError}
+                </div>
+              )}
+
+              {/* Checkout button — only when payment element is NOT yet loaded */}
+              {!clientSecret && (
                 <button
                   type="submit"
+                  disabled={paymentLoading}
                   className="w-full py-3.5 rounded-xl bg-dojo-red text-white font-heading text-lg tracking-wider
-                             hover:bg-dojo-crimson transition-all red-glow-hover mt-2"
+                             hover:bg-dojo-crimson transition-all red-glow-hover mt-2
+                             disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Check Out
+                  {paymentLoading ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <svg className="animate-spin w-5 h-5" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      Setting up payment...
+                    </span>
+                  ) : (
+                    'Check Out'
+                  )}
                 </button>
               )}
             </form>
 
-            {/* Payment section — only visible after form validation + "Check Out" click */}
-            {showPayment && (
+            {/* ── Stripe Payment Element ── */}
+            {clientSecret && (
               <div className="px-6 pb-6">
                 <div className="border-t border-white/5 pt-6">
                   <div className="flex items-center gap-2 mb-4">
-                    <svg
-                      className="w-4 h-4 text-dojo-gold"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
+                    <svg className="w-4 h-4 text-dojo-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -249,35 +401,18 @@ export default function SectionCheckout() {
                     </span>
                   </div>
 
-                  {/* Stripe placeholder — will be replaced with real Stripe Elements */}
-                  <div
-                    id="stripe-payment-element"
-                    className="min-h-[120px] rounded-xl bg-dojo-carbon border border-white/10 p-6 flex items-center justify-center"
+                  <Elements
+                    stripe={stripePromise}
+                    options={{
+                      clientSecret,
+                      appearance: stripeAppearance,
+                    }}
                   >
-                    <div className="text-center">
-                      <div className="w-10 h-10 mx-auto mb-3 rounded-full bg-dojo-red/10 border border-dojo-red/20 flex items-center justify-center">
-                        <svg
-                          className="w-5 h-5 text-dojo-red"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
-                          />
-                        </svg>
-                      </div>
-                      <p className="text-sm text-gray-400">
-                        Stripe payment integration loading...
-                      </p>
-                      <p className="text-[10px] text-gray-600 mt-1">
-                        Secure payment processing will appear here
-                      </p>
-                    </div>
-                  </div>
+                    <StripePaymentForm
+                      onSuccess={handlePaymentSuccess}
+                      formData={formData}
+                    />
+                  </Elements>
 
                   {/* Order summary */}
                   <div className="mt-4 p-4 rounded-xl bg-dojo-carbon/50 border border-white/5">
@@ -305,12 +440,7 @@ export default function SectionCheckout() {
           {/* Trust signals */}
           <div className="mt-6 flex flex-wrap justify-center gap-6 text-center">
             <div className="flex items-center gap-2 text-xs text-gray-500">
-              <svg
-                className="w-4 h-4 text-dojo-gold"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
+              <svg className="w-4 h-4 text-dojo-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -321,12 +451,7 @@ export default function SectionCheckout() {
               256-bit SSL Encrypted
             </div>
             <div className="flex items-center gap-2 text-xs text-gray-500">
-              <svg
-                className="w-4 h-4 text-dojo-gold"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
+              <svg className="w-4 h-4 text-dojo-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -337,12 +462,7 @@ export default function SectionCheckout() {
               No Long-Term Contracts
             </div>
             <div className="flex items-center gap-2 text-xs text-gray-500">
-              <svg
-                className="w-4 h-4 text-dojo-gold"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
+              <svg className="w-4 h-4 text-dojo-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"

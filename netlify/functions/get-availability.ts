@@ -1,5 +1,6 @@
 import type { Context } from '@netlify/functions';
 import pool from './db';
+import { filterBookableSlots } from '../../src/lib/bookingRules';
 
 export default async (req: Request, _context: Context) => {
   const url = new URL(req.url);
@@ -28,7 +29,7 @@ export default async (req: Request, _context: Context) => {
     );
 
     return new Response(
-      JSON.stringify({ slots: result.rows }),
+      JSON.stringify({ slots: filterBookableSlots(result.rows) }),
       {
         status: 200,
         headers: {

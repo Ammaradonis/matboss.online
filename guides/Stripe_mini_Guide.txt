@@ -1,0 +1,165 @@
+Stripe Payment Element
+Accept payment methods from around the globe with a secure, embeddable UI component.
+The Payment Element is a UI component for the web that lets you accept more than 100 payment methods, validates input, and handles errors. Use it alone or with other elements in your web app’s front end.
+
+Customer location
+
+United States (USD)
+Size
+
+Desktop
+Theme
+
+Stripe
+Layout
+
+Accordion
+This demo only displays Google Pay or Apple Pay if you have an active card with either wallet.
+Compatible APIs
+Stripe offers two core payments APIs compatible with Elements. We recommend the Checkout Sessions API for most integrations.
+
+Use the Checkout Sessions API to build your checkout flow. Checkout Sessions covers similar use cases as Payment Intents, including basic payments using price_data or full checkout with line items, tax, discounts, shipping, subscriptions, or Adaptive Pricing (only available with Checkout Sessions).
+
+Build a checkout page with the Checkout Sessions API.
+
+The Payment Intents API is a lower-level API that models only the payment step. You pass in a final amount and build all checkout logic yourself, including tax calculation, discounts, shipping, subscriptions, and currency conversion. Use Payment Intents only if you want to deeply own your checkout state and build these features yourself.
+
+Build a custom integration from scratch with the Payment Intents API.
+
+
+
+
+
+
+
+
+Build an advanced integration with Payment Element and Checkout Sessions
+Build an integration with the Payment Element using the Checkout Sessions API.
+
+Build an integration with Payment Element and Payment Intents
+Use the Payment Intents API to build your own checkout flow.
+
+Clone a sample app on GitHub
+HTML · React · Vue
+View the Stripe.js reference
+Combine elements
+The Payment Element interoperates with other elements. For instance, this form uses one additional element to autofill checkout details, and another to collect the shipping address.
+
+Note
+You can’t remove the Link legal agreement because it’s required to ensure compliance with proper user awareness of terms of services and privacy policies. The terms object doesn’t apply to the Link legal agreement.
+
+A form with contact info, shipping address, and payment fields. The contact info is labeled Link Authentication Element, the shipping address is labeled Address Element, and the payment fields are labeled Payment Element.Payment form combining multiple elements
+
+For the complete code for this example, see Add Link to an Elements integration.
+
+You can also combine the Payment Element with the Express Checkout Element. In this case, wallet payment methods such as Apple Pay and Google Pay are only displayed in the Express Checkout Element to avoid duplication.
+
+Payment methods
+Stripe enables certain payment methods for you by default. We might also enable additional payment methods after notifying you. Use the Dashboard to enable or disable payment methods at any time. With the Payment Element, you can use Dynamic payment methods to:
+
+Manage payment methods in the Dashboard without coding
+Dynamically display the most relevant payment options based on factors such as location, currency, and transaction amount
+For instance, if a customer in Germany is paying in EUR, they see all the active payment methods that accept EUR, starting with ones that are widely used in Germany.
+
+A variety of payment methods.
+Show payment methods in order of relevance to your customer
+
+To further customize how payment methods render, see Customize payment methods. To add payment methods integrated outside of Stripe, you can use custom payment methods.
+
+If your integration requires you to list payment methods manually, see Manually list payment methods.
+
+Layout
+You can customize the Payment Element’s layout to fit your checkout flow. The following image is the same Payment Element rendered using different layout configurations.
+
+Examples of the three checkout forms. The image shows the tab option, where customers pick from payment methods shown as tabs or the two accordion options, where payment methods are vertically listed. You can choose to either display radio buttons or not in the accordion view. 
+Payment Element with different layouts.
+
+
+Tabs
+
+Accordion with radio buttons
+
+Accordion without radio buttons
+The tabs layout displays payment methods horizontally using tabs. To use this layout, set the value for layout.type to tabs. You can also specify other properties, such as layout.defaultCollapsed.
+
+index.js
+View full sample
+
+
+
+const stripe = Stripe('pk_test_51TEZFL7eL3zHPtEArXiMFcTD9EwbEQPq4eew0qIi1KhSWEqGY8NaOsgA3hXRvH619GATmx27hPyFgSY6YiAv9PQX00YNJnU0QS');
+
+const appearance = { /* appearance */ };
+const options = {
+  layout: {
+    type: 'tabs',
+    defaultCollapsed: false,
+  }
+};
+See all 12 lines
+Appearance
+Use the Appearance API to control the style of all elements. Choose a theme or update specific details.
+
+Examples of light and dark modes for the payment element checkout form.
+For instance, choose the “flat” theme and override the primary text color.
+
+index.js
+View full sample
+
+
+
+const stripe = Stripe('pk_test_51TEZFL7eL3zHPtEArXiMFcTD9EwbEQPq4eew0qIi1KhSWEqGY8NaOsgA3hXRvH619GATmx27hPyFgSY6YiAv9PQX00YNJnU0QS');
+
+const appearance = {
+  theme: 'flat',
+  variables: { colorPrimaryText: '#262626' }
+};
+See all 10 lines
+See the Appearance API documentation for a full list of themes and variables.
+
+Options
+Stripe elements support more options than these. For instance, display your business name using the business option.
+
+index.js
+View full sample
+
+
+
+const stripe = Stripe('pk_test_51TEZFL7eL3zHPtEArXiMFcTD9EwbEQPq4eew0qIi1KhSWEqGY8NaOsgA3hXRvH619GATmx27hPyFgSY6YiAv9PQX00YNJnU0QS');
+
+const appearance = { /* appearance */};
+const options = {
+  business: { name: "RocketRides" }
+};
+See all 10 lines
+The Payment Element supports the following options. See each options’s reference entry for more information.
+
+layout	Layout for the Payment Element.
+defaultValues	Initial customer information to display in the Payment Element.
+business	Information about your business to display in the Payment Element.
+paymentMethodOrder	Order to list payment methods in.
+fields	Whether to display certain fields.
+readOnly	Whether payment details can be changed.
+terms	Whether mandates or other legal agreements are displayed in the Payment Element. The default behavior is to show them only when necessary.
+wallets	Whether to show wallets like Apple Pay or Google Pay. The default is to show them when possible.
+Errors
+Payment Element automatically shows localized customer-facing error messages during client confirmation for the following decline codes:
+
+card_declined
+card_velocity_exceeded
+expired_card
+fraudulent
+generic_decline
+incorrect_cvc
+incorrect_number
+incorrect_zip
+insufficient_funds
+invalid_cvc
+invalid_expiry_month
+invalid_expiry_year
+live_mode_test_card
+lost_card
+processing_error
+stolen_card
+test_mode_live_card
+To display messages for other types of errors, refer to error codes and error handling.

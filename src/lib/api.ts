@@ -1,4 +1,11 @@
 import type { TimeSlot, BookingFormData, BookingConfirmation } from '../types';
+import {
+  filterBookableSlots,
+  getSanDiegoDateObject,
+  isSlotBookable,
+  SD_TIMEZONE,
+  SLOT_POLICY_ERROR,
+} from './bookingRules';
 
 const API_BASE = '/.netlify/functions';
 
@@ -14,7 +21,7 @@ function generateFallbackSlots(year: number, month: number): TimeSlot[] {
     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
     // Skip past dates
-    const today = new Date();
+    const today = getSanDiegoDateObject();
     today.setHours(0, 0, 0, 0);
     if (date < today) continue;
 
@@ -93,7 +100,7 @@ function generateFallbackSlots(year: number, month: number): TimeSlot[] {
     }
   }
 
-  return slots;
+  return filterBookableSlots(slots);
 }
 
 export async function fetchAvailability(year: number, month: number): Promise<TimeSlot[]> {
@@ -101,7 +108,7 @@ export async function fetchAvailability(year: number, month: number): Promise<Ti
     const res = await fetch(`${API_BASE}/get-availability?year=${year}&month=${month + 1}`);
     if (!res.ok) throw new Error('API unavailable');
     const data = await res.json();
-    return data.slots;
+    return filterBookableSlots(data.slots);
   } catch {
     return generateFallbackSlots(year, month);
   }
@@ -112,6 +119,10 @@ export async function bookSlot(
   formData: BookingFormData,
   timezone: string
 ): Promise<BookingConfirmation> {
+  if (!isSlotBookable(slot)) {
+    throw new Error(SLOT_POLICY_ERROR);
+  }
+
   try {
     const res = await fetch(`${API_BASE}/book-slot`, {
       method: 'POST',
@@ -120,14 +131,26 @@ export async function bookSlot(
     });
 
     if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error || 'Booking failed');
+      let errorMessage = 'Booking failed. Please try again.';
+
+      try {
+        const err = await res.json();
+        errorMessage = err.error || errorMessage;
+      } catch {
+        // Fall back to a generic message when the error body is unavailable.
+      }
+
+      throw new Error(errorMessage);
     }
 
     const confirmation: BookingConfirmation = await res.json();
     sendToWebhook(formData, confirmation, slot);
     return confirmation;
   } catch (err) {
+    if (!(err instanceof TypeError)) {
+      throw err;
+    }
+
     // Fallback: generate a confirmation locally for demo purposes
     const dateStr = slot.slot_date.replace(/-/g, '');
     const rand = String(Math.floor(Math.random() * 10000)).padStart(4, '0');
@@ -200,8 +223,6 @@ function sendToWebhook(
     }),
   }).catch(() => {});
 }
-
-export const SD_TIMEZONE = 'America/Los_Angeles';
 
 export function detectTimezone(): string {
   return SD_TIMEZONE;
