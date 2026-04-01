@@ -3,9 +3,90 @@ import Stripe from 'stripe';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET!;
-const MAKE_WEBHOOK_URL = 'https://hook.eu1.make.com/yibfibqog07hbmut2jizf71k9u1jsqxy';
+const SUCCESS_WEBHOOK_URL = process.env.PAYMENT_SUCCESSFUL_MAKE_WEBHOOK;
+const FAILURE_WEBHOOK_URL = process.env.PAYMENT_FAILED_MAKE_WEBHOOK;
 
 const headers = { 'Content-Type': 'application/json' };
+
+function getPaymentMethodLabel(pm: Stripe.PaymentMethod | null | undefined): string {
+  if (!pm) return 'Unknown';
+
+  if (pm.type === 'card' && pm.card) {
+    const wallet = pm.card.wallet?.type;
+    if (wallet) {
+      const walletLabels: Record<string, string> = {
+        apple_pay: 'Apple Pay',
+        google_pay: 'Google Pay',
+        samsung_pay: 'Samsung Pay',
+        link: 'Link',
+      };
+      return walletLabels[wallet] || wallet;
+    }
+    const brand = pm.card.brand || 'Unknown';
+    const brandLabels: Record<string, string> = {
+      visa: 'Visa card',
+      mastercard: 'Mastercard card',
+      amex: 'AMEX card',
+      diners: 'Diners Club card',
+      discover: 'Discover card',
+      jcb: 'JCB card',
+      unionpay: 'UnionPay card',
+    };
+    return brandLabels[brand] || `${brand} card`;
+  }
+
+  const typeLabels: Record<string, string> = {
+    paypal: 'PayPal',
+    klarna: 'Klarna',
+    amazon_pay: 'Amazon Pay',
+    revolut_pay: 'Revolut Pay',
+    us_bank_account: 'ACH Direct Debit',
+    customer_balance: 'Bank Transfer',
+    link: 'Link',
+    affirm: 'Affirm',
+    afterpay_clearpay: 'Afterpay',
+    cashapp: 'Cash App Pay',
+  };
+  return typeLabels[pm.type] || pm.type;
+}
+
+async function resolvePaymentMethod(
+  pi: Stripe.PaymentIntent,
+  failed: boolean,
+): Promise<Stripe.PaymentMethod | null> {
+  if (failed && pi.last_payment_error?.payment_method) {
+    return pi.last_payment_error.payment_method as Stripe.PaymentMethod;
+  }
+  if (pi.payment_method) {
+    try {
+      const pmId = typeof pi.payment_method === 'string'
+        ? pi.payment_method
+        : pi.payment_method.id;
+      return await stripe.paymentMethods.retrieve(pmId);
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+async function forwardToMakeWebhook(
+  url: string,
+  payload: Record<string, string>,
+): Promise<void> {
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      console.error(`Make.com webhook returned ${res.status}: ${await res.text()}`);
+    }
+  } catch (err: any) {
+    console.error('Make.com webhook forward failed:', err.message);
+  }
+}
 
 export default async (req: Request, _context: Context) => {
   if (req.method !== 'POST') {
@@ -37,36 +118,25 @@ export default async (req: Request, _context: Context) => {
     );
   }
 
-  // Handle the event
   switch (event.type) {
     case 'payment_intent.succeeded': {
       const pi = event.data.object as Stripe.PaymentIntent;
       const meta = pi.metadata;
       console.log(`Payment succeeded: ${pi.id} — ${meta.school_name} (${meta.email})`);
 
-      // Forward to Make.com for automation workflows
-      try {
-        await fetch(MAKE_WEBHOOK_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            event: 'payment_succeeded',
-            payment_intent_id: pi.id,
-            amount: pi.amount,
-            currency: pi.currency,
-            school_name: meta.school_name,
-            owner_name: meta.owner_name,
-            email: meta.email,
-            phone: meta.phone,
-            num_students: meta.num_students,
-            current_software: meta.current_software,
-            receipt_email: pi.receipt_email,
-            created: new Date(pi.created * 1000).toISOString(),
-          }),
+      const pm = await resolvePaymentMethod(pi, false);
+
+      if (SUCCESS_WEBHOOK_URL) {
+        await forwardToMakeWebhook(SUCCESS_WEBHOOK_URL, {
+          school_name: meta.school_name || '',
+          owner_name: meta.owner_name || '',
+          email: meta.email || '',
+          phone: meta.phone || '',
+          current_students: meta.num_students || '',
+          current_software: meta.current_software || '',
+          payment_method: getPaymentMethodLabel(pm),
+          status: 'success',
         });
-      } catch (webhookErr: any) {
-        // Log but don't fail — Stripe delivery is the priority
-        console.error('Make.com webhook forward failed:', webhookErr.message);
       }
       break;
     }
@@ -77,6 +147,21 @@ export default async (req: Request, _context: Context) => {
       console.error(
         `Payment failed: ${pi.id} — ${meta.school_name} (${meta.email}) — ${pi.last_payment_error?.message}`,
       );
+
+      const pm = await resolvePaymentMethod(pi, true);
+
+      if (FAILURE_WEBHOOK_URL) {
+        await forwardToMakeWebhook(FAILURE_WEBHOOK_URL, {
+          school_name: meta.school_name || '',
+          owner_name: meta.owner_name || '',
+          email: meta.email || '',
+          phone: meta.phone || '',
+          current_students: meta.num_students || '',
+          current_software: meta.current_software || '',
+          payment_method: getPaymentMethodLabel(pm),
+          status: 'failure',
+        });
+      }
       break;
     }
 
@@ -84,6 +169,5 @@ export default async (req: Request, _context: Context) => {
       console.log(`Unhandled event type: ${event.type}`);
   }
 
-  // Always return 200 quickly to acknowledge receipt
   return new Response(JSON.stringify({ received: true }), { status: 200, headers });
 };
