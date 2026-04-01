@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom';
+
 export default function Footer() {
   const year = new Date().getFullYear();
 
@@ -76,6 +78,14 @@ export default function Footer() {
           <p className="text-[10px] text-gray-600">
             &copy; {year} MatBoss - Stop the Leaks. All rights reserved. San Diego, CA.
           </p>
+          <div className="flex items-center gap-4">
+            <Link to="/terms" className="text-[10px] text-gray-600 hover:text-white transition-colors">
+              Terms of Service
+            </Link>
+            <Link to="/privacy" className="text-[10px] text-gray-600 hover:text-white transition-colors">
+              Privacy Policy
+            </Link>
+          </div>
           <p className="text-[10px] text-gray-700">
             Built for San Diego martial arts school owners who refuse to leave money on the mat.
           </p>
