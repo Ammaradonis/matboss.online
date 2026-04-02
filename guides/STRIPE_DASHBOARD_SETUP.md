@@ -6,12 +6,14 @@ This guide covers **exactly** what you need to do in your Stripe Dashboard to co
 
 ## 1. Add Environment Variables to Netlify
 
-Go to **Netlify Dashboard > Site > Site configuration > Environment variables** and add these two:
+Go to **Netlify Dashboard > Site > Site configuration > Environment variables** and add these four:
 
-| Variable                 | Value                            |
-|--------------------------|----------------------------------|
-| `STRIPE_SECRET_KEY`      | Your **Secret key** from Stripe (`sk_test_...` for test, `sk_live_...` for production) |
-| `STRIPE_WEBHOOK_SECRET`  | The webhook signing secret you'll get in Step 3 below (`whsec_...`) |
+| Variable                            | Value                            |
+|-------------------------------------|----------------------------------|
+| `STRIPE_SECRET_KEY`                 | Your **Secret key** from Stripe (`sk_test_...` for test, `sk_live_...` for production) |
+| `STRIPE_WEBHOOK_SECRET`             | The webhook signing secret you'll get in Step 3 below (`whsec_...`) |
+| `PAYMENT_SUCCESSFUL_MAKE_WEBHOOK`   | Your Make.com webhook URL for **successful** payments |
+| `PAYMENT_FAILED_MAKE_WEBHOOK`       | Your Make.com webhook URL for **failed** payments |
 
 > The **Publishable key** (`pk_test_51TFyG9...`) is already hardcoded in the frontend code. When you switch to production, you will replace it with your `pk_live_...` key.
 
@@ -110,7 +112,7 @@ With your **test keys** active (`pk_test_...` / `sk_test_...`), use these test c
 When you're ready to accept real payments:
 
 - [ ] **Switch API keys**: In the Stripe Dashboard, toggle from "Test mode" to live mode. Copy your **live** Secret key and Publishable key.
-- [ ] **Update Netlify env vars**: Replace `STRIPE_SECRET_KEY` with your `sk_live_...` key.
+- [ ] **Update Netlify env vars**: Replace `STRIPE_SECRET_KEY` with your `sk_live_...` key. Verify that `PAYMENT_SUCCESSFUL_MAKE_WEBHOOK` and `PAYMENT_FAILED_MAKE_WEBHOOK` are set to your production Make.com webhook URLs.
 - [ ] **Update the frontend key**: In `src/components/pricing/SectionCheckout.tsx`, replace the `pk_test_...` key with your `pk_live_...` key.
 - [ ] **Create a live webhook**: Repeat Step 3 above, but make sure you're NOT in test mode. The endpoint URL stays the same. Copy the new live `whsec_...` and update `STRIPE_WEBHOOK_SECRET` in Netlify.
 - [ ] **Verify domain for Apple Pay**: If not done already, complete Step 4 in live mode.
@@ -158,10 +160,33 @@ Customer fills form  ──>  "Check Out" button
               │  /stripe-webhook                 │
               │                                  │
               │  Verifies signature              │
-              │  Forwards to Make.com webhook    │
-              │  (automation workflows)          │
+              │  Resolves payment method label   │
+              │  Routes by event type:           │
+              │                                  │
+              │  payment_intent.succeeded ──>     │
+              │    PAYMENT_SUCCESSFUL_MAKE_WEBHOOK│
+              │                                  │
+              │  payment_intent.payment_failed ─> │
+              │    PAYMENT_FAILED_MAKE_WEBHOOK    │
               └─────────────────────────────────┘
 ```
+
+### Make.com Webhook Payloads
+
+Both the success and failure Make.com webhooks receive the **same JSON payload shape**. The only difference is the `status` field value.
+
+| Field              | Description                                                       | Example                 |
+|--------------------|-------------------------------------------------------------------|-------------------------|
+| `school_name`      | Name of the martial arts school                                   | `"San Diego MMA"`       |
+| `owner_name`       | Full name of the school owner                                     | `"John Smith"`          |
+| `email`            | Owner's email address                                             | `"john@example.com"`    |
+| `phone`            | Owner's phone number                                              | `"(619) 555-0123"`      |
+| `current_students` | Number of current students                                        | `"75"`                  |
+| `current_software` | Software the school currently uses                                | `"Zen Planner"`         |
+| `payment_method`   | Resolved payment method label (card brand, wallet, or alternative)| `"Visa card"`, `"Apple Pay"` |
+| `status`           | `"success"` or `"failure"`                                        | `"success"`             |
+
+> The `payment_method` field auto-detects the method used: card brands (Visa, Mastercard, AMEX, etc.), digital wallets (Apple Pay, Google Pay, Samsung Pay, Link), and alternative methods (PayPal, Klarna, Cash App Pay, etc.).
 
 ### Pricing Breakdown
 
