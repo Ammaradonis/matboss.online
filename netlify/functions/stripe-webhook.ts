@@ -5,6 +5,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET!;
 const SUCCESS_WEBHOOK_URL = process.env.PAYMENT_SUCCESSFUL_MAKE_WEBHOOK;
 const FAILURE_WEBHOOK_URL = process.env.PAYMENT_FAILED_MAKE_WEBHOOK;
+const DEFAULT_BANK_TRANSFER_DAYS_UNTIL_DUE = 7;
 
 const headers = { 'Content-Type': 'application/json' };
 
@@ -48,6 +49,19 @@ function getPaymentMethodLabel(pm: Stripe.PaymentMethod | null | undefined): str
     cashapp: 'Cash App Pay',
   };
   return typeLabels[pm.type] || pm.type;
+}
+
+function getPaymentMethodLabelForMetadata(
+  pm: Stripe.PaymentMethod | null | undefined,
+  meta: Stripe.Metadata,
+): string {
+  if (pm) {
+    return getPaymentMethodLabel(pm);
+  }
+  if (meta.recurring_payment_method === 'customer_balance' || meta.initial_payment_method === 'bank_transfer') {
+    return 'Bank Transfer';
+  }
+  return 'Unknown';
 }
 
 async function resolvePaymentMethod(
@@ -109,6 +123,25 @@ async function ensurePaymentMethodAttached(
   }
 }
 
+function getSubscriptionMetadata(meta: Stripe.Metadata): Record<string, string> {
+  return {
+    school_name: meta.school_name || '',
+    owner_name: meta.owner_name || '',
+    email: meta.email || '',
+    phone: meta.phone || '',
+    num_students: meta.num_students || '',
+    current_software: meta.current_software || '',
+  };
+}
+
+function getBankTransferDaysUntilDue(meta: Stripe.Metadata): number {
+  const parsed = Number.parseInt(meta.invoice_days_until_due || '', 10);
+  if (Number.isFinite(parsed) && parsed > 0) {
+    return parsed;
+  }
+  return DEFAULT_BANK_TRANSFER_DAYS_UNTIL_DUE;
+}
+
 export default async (req: Request, _context: Context) => {
   if (req.method !== 'POST') {
     return new Response(
@@ -140,6 +173,41 @@ export default async (req: Request, _context: Context) => {
   }
 
   switch (event.type) {
+    case 'payment_intent.requires_action': {
+      const pi = event.data.object as Stripe.PaymentIntent;
+      const meta = pi.metadata;
+      const isBankTransfer = meta.initial_payment_method === 'bank_transfer'
+        || pi.next_action?.type === 'display_bank_transfer_instructions';
+
+      if (!isBankTransfer || !meta.school_name) {
+        console.log(`PI ${pi.id} requires action`);
+        break;
+      }
+
+      const instructions = (pi.next_action as any)?.display_bank_transfer_instructions;
+      console.log(
+        `Bank transfer instructions issued: ${pi.id} — ${meta.school_name} (${meta.email}) — amount remaining $${((instructions?.amount_remaining ?? pi.amount) / 100).toFixed(2)}`,
+      );
+      break;
+    }
+
+    case 'payment_intent.partially_funded': {
+      const pi = event.data.object as Stripe.PaymentIntent;
+      const meta = pi.metadata;
+
+      if (meta.initial_payment_method !== 'bank_transfer' || !meta.school_name) {
+        console.log(`PI ${pi.id} partially funded`);
+        break;
+      }
+
+      const amountReceived = typeof pi.amount_received === 'number' ? pi.amount_received : 0;
+      const amountRemaining = Math.max(pi.amount - amountReceived, 0);
+      console.log(
+        `Bank transfer partially funded: ${pi.id} — ${meta.school_name} (${meta.email}) — received $${(amountReceived / 100).toFixed(2)}, remaining $${(amountRemaining / 100).toFixed(2)}`,
+      );
+      break;
+    }
+
     case 'payment_intent.processing': {
       const pi = event.data.object as Stripe.PaymentIntent;
       const meta = pi.metadata;
@@ -190,7 +258,7 @@ export default async (req: Request, _context: Context) => {
           phone: meta.phone || '',
           current_students: meta.num_students || '',
           current_software: meta.current_software || '',
-          payment_method: getPaymentMethodLabel(pm),
+          payment_method: getPaymentMethodLabelForMetadata(pm, meta),
           amount: String((invoice.amount_paid / 100).toFixed(2)),
           status: 'success',
         });
@@ -233,7 +301,7 @@ export default async (req: Request, _context: Context) => {
           phone: meta.phone || '',
           current_students: meta.num_students || '',
           current_software: meta.current_software || '',
-          payment_method: getPaymentMethodLabel(pm),
+          payment_method: getPaymentMethodLabelForMetadata(pm, meta),
           amount: String((invoice.amount_due / 100).toFixed(2)),
           status: 'failure',
         });
@@ -259,43 +327,58 @@ export default async (req: Request, _context: Context) => {
       if (meta.price_id && pi.customer) {
         try {
           const customerId = typeof pi.customer === 'string' ? pi.customer : pi.customer.id;
+          const isBankTransferFlow = meta.initial_payment_method === 'bank_transfer';
           const pmId = typeof pi.payment_method === 'string'
             ? pi.payment_method
             : pi.payment_method?.id;
 
-          if (pmId) {
-            // Guard: skip if customer already has a subscription (webhook retry)
-            const existing = await stripe.subscriptions.list({
+          // Guard: skip if customer already has a subscription (webhook retry)
+          const existing = await stripe.subscriptions.list({
+            customer: customerId,
+            limit: 1,
+          });
+          if (existing.data.length > 0) {
+            console.log(`Customer ${customerId} already has subscription ${existing.data[0].id}, skipping`);
+          } else if (isBankTransferFlow) {
+            const trialEnd = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
+            const daysUntilDue = getBankTransferDaysUntilDue(meta);
+            const subscription = await stripe.subscriptions.create({
               customer: customerId,
-              limit: 1,
+              items: [{ price: meta.price_id }],
+              collection_method: 'send_invoice',
+              days_until_due: daysUntilDue,
+              payment_settings: {
+                payment_method_types: ['customer_balance'],
+              },
+              trial_end: trialEnd,
+              metadata: {
+                ...getSubscriptionMetadata(meta),
+                recurring_payment_method: 'customer_balance',
+                initial_payment_method: 'bank_transfer',
+              },
             });
-            if (existing.data.length > 0) {
-              console.log(`Customer ${customerId} already has subscription ${existing.data[0].id}, skipping`);
-            } else {
-              // setup_future_usage already saves eligible methods; only attach if Stripe has not done so yet
-              await ensurePaymentMethodAttached(customerId, pmId);
-              await stripe.customers.update(customerId, {
-                invoice_settings: { default_payment_method: pmId },
-              });
+            console.log(
+              `Bank transfer subscription created: ${subscription.id} for ${meta.school_name} — monthly invoices start ${new Date(trialEnd * 1000).toISOString()} with ${daysUntilDue} day payment terms`,
+            );
+          } else if (pmId) {
+            // setup_future_usage already saves eligible methods; only attach if Stripe has not done so yet
+            await ensurePaymentMethodAttached(customerId, pmId);
+            await stripe.customers.update(customerId, {
+              invoice_settings: { default_payment_method: pmId },
+            });
 
-              // Create subscription starting ~30 days from now (first month already paid)
-              const trialEnd = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
-              const subscription = await stripe.subscriptions.create({
-                customer: customerId,
-                items: [{ price: meta.price_id }],
-                default_payment_method: pmId,
-                trial_end: trialEnd,
-                metadata: {
-                  school_name: meta.school_name || '',
-                  owner_name: meta.owner_name || '',
-                  email: meta.email || '',
-                  phone: meta.phone || '',
-                  num_students: meta.num_students || '',
-                  current_software: meta.current_software || '',
-                },
-              });
-              console.log(`Subscription created: ${subscription.id} for ${meta.school_name} — bills $197/mo starting ${new Date(trialEnd * 1000).toISOString()}`);
-            }
+            // Create subscription starting ~30 days from now (first month already paid)
+            const trialEnd = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
+            const subscription = await stripe.subscriptions.create({
+              customer: customerId,
+              items: [{ price: meta.price_id }],
+              default_payment_method: pmId,
+              trial_end: trialEnd,
+              metadata: getSubscriptionMetadata(meta),
+            });
+            console.log(`Subscription created: ${subscription.id} for ${meta.school_name} — bills $197/mo starting ${new Date(trialEnd * 1000).toISOString()}`);
+          } else {
+            console.log(`PI ${pi.id} succeeded but no reusable payment method was available for recurring billing`);
           }
         } catch (subErr: any) {
           // Log but don't fail the webhook — the payment already succeeded
@@ -311,7 +394,7 @@ export default async (req: Request, _context: Context) => {
           phone: meta.phone || '',
           current_students: meta.num_students || '',
           current_software: meta.current_software || '',
-          payment_method: getPaymentMethodLabel(pm),
+          payment_method: getPaymentMethodLabelForMetadata(pm, meta),
           status: 'success',
         });
       }
@@ -342,7 +425,7 @@ export default async (req: Request, _context: Context) => {
           phone: meta.phone || '',
           current_students: meta.num_students || '',
           current_software: meta.current_software || '',
-          payment_method: getPaymentMethodLabel(pm),
+          payment_method: getPaymentMethodLabelForMetadata(pm, meta),
           status: 'failure',
         });
       }
