@@ -58,6 +58,7 @@ export default async (req: Request, _context: Context) => {
         current_software,
       },
     });
+    console.log('Step 1 OK — customer:', customer.id);
 
     // 2. Add one-time setup fee — gets rolled into the first invoice automatically
     await stripe.invoiceItems.create({
@@ -66,6 +67,7 @@ export default async (req: Request, _context: Context) => {
       currency: 'usd',
       description: 'MatBoss Enrollment Engine — Setup & Implementation',
     });
+    console.log('Step 2 OK — setup fee invoice item created');
 
     // 3. Create the subscription (incomplete until customer pays the first invoice)
     const subscription = await stripe.subscriptions.create({
@@ -85,21 +87,44 @@ export default async (req: Request, _context: Context) => {
       },
       expand: ['latest_invoice.payment_intent'],
     });
+    console.log('Step 3 OK — subscription:', subscription.id, 'status:', subscription.status);
 
-    const invoice = subscription.latest_invoice as Stripe.Invoice;
-    const paymentIntent = invoice.payment_intent as Stripe.PaymentIntent;
+    const invoice = subscription.latest_invoice;
+    console.log('Step 3a — latest_invoice type:', typeof invoice, 'value:', typeof invoice === 'string' ? invoice : (invoice as any)?.id);
 
-    if (!paymentIntent?.client_secret) {
-      console.error('Subscription created but no client_secret on PaymentIntent', {
-        subscriptionId: subscription.id,
-        invoiceId: invoice.id,
-      });
+    if (!invoice || typeof invoice === 'string') {
+      const msg = `Subscription ${subscription.id} has no expanded invoice (got ${typeof invoice})`;
+      console.error(msg);
       return new Response(
-        JSON.stringify({ error: 'Payment setup failed. Please try again.' }),
+        JSON.stringify({ error: msg }),
         { status: 500, headers },
       );
     }
 
+    const pi = (invoice as Stripe.Invoice).payment_intent;
+    console.log('Step 3b — payment_intent type:', typeof pi, 'value:', typeof pi === 'string' ? pi : (pi as any)?.id, 'client_secret exists:', !!(pi as any)?.client_secret);
+
+    if (!pi || typeof pi === 'string') {
+      const msg = `Invoice ${(invoice as Stripe.Invoice).id} has no expanded payment_intent (got ${typeof pi}: ${pi})`;
+      console.error(msg);
+      return new Response(
+        JSON.stringify({ error: msg }),
+        { status: 500, headers },
+      );
+    }
+
+    const paymentIntent = pi as Stripe.PaymentIntent;
+
+    if (!paymentIntent.client_secret) {
+      const msg = `PaymentIntent ${paymentIntent.id} has no client_secret (status: ${paymentIntent.status})`;
+      console.error(msg);
+      return new Response(
+        JSON.stringify({ error: msg }),
+        { status: 500, headers },
+      );
+    }
+
+    console.log('Step 4 OK — returning client_secret for PI:', paymentIntent.id);
     return new Response(
       JSON.stringify({
         clientSecret: paymentIntent.client_secret,
