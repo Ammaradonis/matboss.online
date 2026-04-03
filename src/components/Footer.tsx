@@ -85,6 +85,9 @@ export default function Footer() {
             <Link to="/privacy" className="text-[10px] text-gray-600 hover:text-white transition-colors">
               Privacy Policy
             </Link>
+            <Link to="/dmarc" className="text-[10px] text-gray-600 hover:text-white transition-colors">
+              DMARC Policy
+            </Link>
           </div>
           <p className="text-[10px] text-gray-700">
             Built for San Diego martial arts school owners who refuse to leave money on the mat.

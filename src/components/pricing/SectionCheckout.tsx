@@ -4,9 +4,7 @@ import { Elements } from '@stripe/react-stripe-js';
 import type { Appearance } from '@stripe/stripe-js';
 import StripePaymentForm from './StripePaymentForm';
 
-const stripePromise = loadStripe(
-  'pk_test_51TFyG9Hzyp1GTXixZOsfMRGRduu7fIgebzEQWCq7TAqr1kdT6EOHqz8RvaVYsKHgeB8XNFu9KbFNUgHkYiD05eHZ00B03pcAQN',
-);
+const stripePromise = loadStripe(import.meta.env.VITE_PUBLISHABLE_KEY);
 
 const stripeAppearance: Appearance = {
   theme: 'night',

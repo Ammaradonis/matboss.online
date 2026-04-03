@@ -3,6 +3,7 @@ import HomePage from './pages/HomePage';
 import PricingPage from './pages/PricingPage';
 import TermsOfServicePage from './pages/TermsOfServicePage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
+import DmarcPolicyPage from './pages/DmarcPolicyPage';
 
 export default function App() {
   return (
@@ -11,6 +12,7 @@ export default function App() {
       <Route path="/pricing" element={<PricingPage />} />
       <Route path="/terms" element={<TermsOfServicePage />} />
       <Route path="/privacy" element={<PrivacyPolicyPage />} />
+      <Route path="/dmarc" element={<DmarcPolicyPage />} />
     </Routes>
   );
 }
