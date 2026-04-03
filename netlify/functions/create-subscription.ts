@@ -69,10 +69,12 @@ export default async (req: Request, _context: Context) => {
     });
     console.log('Step 2 OK — setup fee invoice item created');
 
-    // 3. Create the subscription (incomplete until customer pays the first invoice)
+    // 3. Create the subscription
+    //    collection_method MUST be charge_automatically for payment_behavior to create a PI
     const subscription = await stripe.subscriptions.create({
       customer: customer.id,
       items: [{ price: priceId }],
+      collection_method: 'charge_automatically',
       payment_behavior: 'default_incomplete',
       payment_settings: {
         payment_method_types: ['card'],
@@ -86,50 +88,36 @@ export default async (req: Request, _context: Context) => {
         num_students: String(num_students),
         current_software,
       },
+      expand: ['latest_invoice.payment_intent'],
     });
-    console.log('Step 3 OK — subscription:', subscription.id, 'status:', subscription.status);
 
-    // 4. Retrieve the invoice separately (avoids nested-expand issues)
-    const invoiceId = typeof subscription.latest_invoice === 'string'
-      ? subscription.latest_invoice
-      : subscription.latest_invoice?.id;
+    const invoice = subscription.latest_invoice as Stripe.Invoice;
+    const paymentIntent = invoice?.payment_intent as Stripe.PaymentIntent | null;
 
-    if (!invoiceId) {
-      throw new Error(`Subscription ${subscription.id} created with no invoice`);
-    }
-    console.log('Step 4 OK — invoice ID:', invoiceId);
+    // Fallback: retrieve separately if nested expand didn't populate the PI
+    let clientSecret = paymentIntent?.client_secret ?? null;
 
-    // 5. If invoice is still draft, finalize it so Stripe creates the PaymentIntent
-    let invoice = await stripe.invoices.retrieve(invoiceId);
-    console.log('Step 5 — invoice status:', invoice.status, 'amount_due:', invoice.amount_due, 'payment_intent:', invoice.payment_intent);
-
-    if (invoice.status === 'draft') {
-      console.log('Step 5a — invoice is draft, finalizing...');
-      invoice = await stripe.invoices.finalizeInvoice(invoiceId);
-      console.log('Step 5a OK — finalized, status:', invoice.status, 'payment_intent:', invoice.payment_intent);
+    if (!clientSecret && invoice?.id) {
+      const freshInvoice = await stripe.invoices.retrieve(invoice.id);
+      const piId = typeof freshInvoice.payment_intent === 'string'
+        ? freshInvoice.payment_intent
+        : null;
+      if (piId) {
+        const pi = await stripe.paymentIntents.retrieve(piId);
+        clientSecret = pi.client_secret;
+      }
     }
 
-    // 6. Get the PaymentIntent from the finalized invoice
-    const piId = typeof invoice.payment_intent === 'string'
-      ? invoice.payment_intent
-      : invoice.payment_intent?.id;
-
-    if (!piId) {
-      throw new Error(`Invoice ${invoiceId} (status=${invoice.status}, amount=${invoice.amount_due}) has no PaymentIntent`);
-    }
-
-    const paymentIntent = await stripe.paymentIntents.retrieve(piId);
-    console.log('Step 6 OK — PI:', paymentIntent.id, 'status:', paymentIntent.status);
-
-    if (!paymentIntent.client_secret) {
-      throw new Error(`PaymentIntent ${paymentIntent.id} (status=${paymentIntent.status}) has no client_secret`);
+    if (!clientSecret) {
+      throw new Error(
+        `No PaymentIntent for invoice ${invoice?.id} `
+        + `(status=${invoice?.status}, amount=${invoice?.amount_due}, `
+        + `collection=${invoice?.collection_method})`,
+      );
     }
 
     return new Response(
-      JSON.stringify({
-        clientSecret: paymentIntent.client_secret,
-        subscriptionId: subscription.id,
-      }),
+      JSON.stringify({ clientSecret, subscriptionId: subscription.id }),
       { status: 200, headers },
     );
   } catch (err: any) {
