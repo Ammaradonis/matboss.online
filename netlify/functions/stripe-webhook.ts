@@ -205,20 +205,57 @@ export default async (req: Request, _context: Context) => {
       break;
     }
 
-    // ── Legacy: one-time PaymentIntent succeeded (non-subscription) ──
+    // ── First payment succeeded — create the recurring subscription ──
     case 'payment_intent.succeeded': {
       const pi = event.data.object as Stripe.PaymentIntent;
       const meta = pi.metadata;
 
-      // Skip if this PI was created by a subscription — invoice.paid handles those
       if (!meta.school_name) {
-        console.log(`PI ${pi.id} succeeded — no direct metadata (subscription-managed), skipping`);
+        console.log(`PI ${pi.id} succeeded — no metadata, skipping`);
         break;
       }
 
       console.log(`Payment succeeded: ${pi.id} — ${meta.school_name} (${meta.email})`);
 
       const pm = await resolvePaymentMethod(pi, false);
+
+      // ── Create the monthly subscription if this PI has a price_id ──
+      if (meta.price_id && pi.customer) {
+        try {
+          const customerId = typeof pi.customer === 'string' ? pi.customer : pi.customer.id;
+          const pmId = typeof pi.payment_method === 'string'
+            ? pi.payment_method
+            : pi.payment_method?.id;
+
+          if (pmId) {
+            // Set the payment method as the customer's default for invoices
+            await stripe.customers.update(customerId, {
+              invoice_settings: { default_payment_method: pmId },
+            });
+
+            // Create subscription starting ~30 days from now (first month already paid)
+            const trialEnd = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
+            const subscription = await stripe.subscriptions.create({
+              customer: customerId,
+              items: [{ price: meta.price_id }],
+              default_payment_method: pmId,
+              trial_end: trialEnd,
+              metadata: {
+                school_name: meta.school_name || '',
+                owner_name: meta.owner_name || '',
+                email: meta.email || '',
+                phone: meta.phone || '',
+                num_students: meta.num_students || '',
+                current_software: meta.current_software || '',
+              },
+            });
+            console.log(`Subscription created: ${subscription.id} for ${meta.school_name} — trial until ${new Date(trialEnd * 1000).toISOString()}`);
+          }
+        } catch (subErr: any) {
+          // Log but don't fail the webhook — the payment already succeeded
+          console.error('Subscription creation failed after payment:', subErr.message);
+        }
+      }
 
       if (SUCCESS_WEBHOOK_URL) {
         await forwardToMakeWebhook(SUCCESS_WEBHOOK_URL, {
@@ -235,13 +272,13 @@ export default async (req: Request, _context: Context) => {
       break;
     }
 
-    // ── Legacy: one-time PaymentIntent failed (non-subscription) ──
+    // ── First payment failed ──
     case 'payment_intent.payment_failed': {
       const pi = event.data.object as Stripe.PaymentIntent;
       const meta = pi.metadata;
 
       if (!meta.school_name) {
-        console.log(`PI ${pi.id} failed — no direct metadata (subscription-managed), skipping`);
+        console.log(`PI ${pi.id} failed — no metadata, skipping`);
         break;
       }
 
