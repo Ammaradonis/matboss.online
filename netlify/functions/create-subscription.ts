@@ -1,8 +1,6 @@
 import type { Context } from '@netlify/functions';
 import Stripe from 'stripe';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
-const MONTHLY_PRICE_ID = process.env.STRIPE_MONTHLY_PRICE_ID!;
 const SETUP_FEE = 11900; // $119.00
 
 const headers = { 'Content-Type': 'application/json' };
@@ -14,6 +12,28 @@ export default async (req: Request, _context: Context) => {
       { status: 405, headers },
     );
   }
+
+  // ── Validate env vars before doing anything ──
+  const secretKey = process.env.STRIPE_SECRET_KEY;
+  const priceId = process.env.STRIPE_MONTHLY_PRICE_ID;
+
+  if (!secretKey) {
+    console.error('STRIPE_SECRET_KEY is not set');
+    return new Response(
+      JSON.stringify({ error: 'Payment service is not configured.' }),
+      { status: 500, headers },
+    );
+  }
+
+  if (!priceId) {
+    console.error('STRIPE_MONTHLY_PRICE_ID is not set — create a $197/month recurring price in Stripe Dashboard and add the price ID to Netlify env vars');
+    return new Response(
+      JSON.stringify({ error: 'Payment service is not configured.' }),
+      { status: 500, headers },
+    );
+  }
+
+  const stripe = new Stripe(secretKey);
 
   try {
     const body = await req.json();
@@ -50,7 +70,7 @@ export default async (req: Request, _context: Context) => {
     // 3. Create the subscription (incomplete until customer pays the first invoice)
     const subscription = await stripe.subscriptions.create({
       customer: customer.id,
-      items: [{ price: MONTHLY_PRICE_ID }],
+      items: [{ price: priceId }],
       payment_behavior: 'default_incomplete',
       payment_settings: {
         payment_method_types: ['card', 'cashapp', 'link', 'us_bank_account', 'paypal'],
@@ -70,6 +90,17 @@ export default async (req: Request, _context: Context) => {
     const invoice = subscription.latest_invoice as Stripe.Invoice;
     const paymentIntent = invoice.payment_intent as Stripe.PaymentIntent;
 
+    if (!paymentIntent?.client_secret) {
+      console.error('Subscription created but no client_secret on PaymentIntent', {
+        subscriptionId: subscription.id,
+        invoiceId: invoice.id,
+      });
+      return new Response(
+        JSON.stringify({ error: 'Payment setup failed. Please try again.' }),
+        { status: 500, headers },
+      );
+    }
+
     return new Response(
       JSON.stringify({
         clientSecret: paymentIntent.client_secret,
@@ -78,9 +109,9 @@ export default async (req: Request, _context: Context) => {
       { status: 200, headers },
     );
   } catch (err: any) {
-    console.error('Subscription creation failed:', err.message);
+    console.error('Subscription creation failed:', err.message, err.stack);
     return new Response(
-      JSON.stringify({ error: 'Payment setup failed. Please try again.' }),
+      JSON.stringify({ error: err.message || 'Payment setup failed. Please try again.' }),
       { status: 500, headers },
     );
   }
