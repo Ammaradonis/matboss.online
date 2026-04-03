@@ -119,9 +119,103 @@ export default async (req: Request, _context: Context) => {
   }
 
   switch (event.type) {
+    // ── Subscription invoice paid (initial + every recurring charge) ──
+    case 'invoice.paid': {
+      const invoice = event.data.object as Stripe.Invoice;
+      if (!invoice.subscription) {
+        console.log(`invoice.paid ${invoice.id} — not a subscription invoice, skipping`);
+        break;
+      }
+
+      const subId = typeof invoice.subscription === 'string'
+        ? invoice.subscription
+        : invoice.subscription.id;
+      const subscription = await stripe.subscriptions.retrieve(subId);
+      const meta = subscription.metadata;
+
+      console.log(
+        `Subscription invoice paid: ${invoice.id} (sub ${subId}) — ${meta.school_name} (${meta.email}) — $${(invoice.amount_paid / 100).toFixed(2)}`,
+      );
+
+      let pm: Stripe.PaymentMethod | null = null;
+      if (invoice.payment_intent) {
+        const piId = typeof invoice.payment_intent === 'string'
+          ? invoice.payment_intent
+          : invoice.payment_intent.id;
+        const pi = await stripe.paymentIntents.retrieve(piId);
+        pm = await resolvePaymentMethod(pi, false);
+      }
+
+      if (SUCCESS_WEBHOOK_URL) {
+        await forwardToMakeWebhook(SUCCESS_WEBHOOK_URL, {
+          school_name: meta.school_name || '',
+          owner_name: meta.owner_name || '',
+          email: meta.email || '',
+          phone: meta.phone || '',
+          current_students: meta.num_students || '',
+          current_software: meta.current_software || '',
+          payment_method: getPaymentMethodLabel(pm),
+          amount: String((invoice.amount_paid / 100).toFixed(2)),
+          status: 'success',
+        });
+      }
+      break;
+    }
+
+    // ── Subscription invoice payment failed (recurring charge declined, etc.) ──
+    case 'invoice.payment_failed': {
+      const invoice = event.data.object as Stripe.Invoice;
+      if (!invoice.subscription) {
+        console.log(`invoice.payment_failed ${invoice.id} — not a subscription invoice, skipping`);
+        break;
+      }
+
+      const subId = typeof invoice.subscription === 'string'
+        ? invoice.subscription
+        : invoice.subscription.id;
+      const subscription = await stripe.subscriptions.retrieve(subId);
+      const meta = subscription.metadata;
+
+      console.error(
+        `Subscription invoice failed: ${invoice.id} (sub ${subId}) — ${meta.school_name} (${meta.email})`,
+      );
+
+      let pm: Stripe.PaymentMethod | null = null;
+      if (invoice.payment_intent) {
+        const piId = typeof invoice.payment_intent === 'string'
+          ? invoice.payment_intent
+          : invoice.payment_intent.id;
+        const pi = await stripe.paymentIntents.retrieve(piId);
+        pm = await resolvePaymentMethod(pi, true);
+      }
+
+      if (FAILURE_WEBHOOK_URL) {
+        await forwardToMakeWebhook(FAILURE_WEBHOOK_URL, {
+          school_name: meta.school_name || '',
+          owner_name: meta.owner_name || '',
+          email: meta.email || '',
+          phone: meta.phone || '',
+          current_students: meta.num_students || '',
+          current_software: meta.current_software || '',
+          payment_method: getPaymentMethodLabel(pm),
+          amount: String((invoice.amount_due / 100).toFixed(2)),
+          status: 'failure',
+        });
+      }
+      break;
+    }
+
+    // ── Legacy: one-time PaymentIntent succeeded (non-subscription) ──
     case 'payment_intent.succeeded': {
       const pi = event.data.object as Stripe.PaymentIntent;
       const meta = pi.metadata;
+
+      // Skip if this PI was created by a subscription — invoice.paid handles those
+      if (!meta.school_name) {
+        console.log(`PI ${pi.id} succeeded — no direct metadata (subscription-managed), skipping`);
+        break;
+      }
+
       console.log(`Payment succeeded: ${pi.id} — ${meta.school_name} (${meta.email})`);
 
       const pm = await resolvePaymentMethod(pi, false);
@@ -141,9 +235,16 @@ export default async (req: Request, _context: Context) => {
       break;
     }
 
+    // ── Legacy: one-time PaymentIntent failed (non-subscription) ──
     case 'payment_intent.payment_failed': {
       const pi = event.data.object as Stripe.PaymentIntent;
       const meta = pi.metadata;
+
+      if (!meta.school_name) {
+        console.log(`PI ${pi.id} failed — no direct metadata (subscription-managed), skipping`);
+        break;
+      }
+
       console.error(
         `Payment failed: ${pi.id} — ${meta.school_name} (${meta.email}) — ${pi.last_payment_error?.message}`,
       );

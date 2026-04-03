@@ -1,0 +1,1137 @@
+# Payment status updates
+
+Monitor and verify payment status, so that you can respond to successful and failed payments.
+
+*PaymentIntents* (The Payment Intents API tracks the lifecycle of a customer checkout flow and triggers additional authentication steps when required by regulatory mandates, custom Radar fraud rules, or redirect-based payment methods) update in response to actions taken by the customer or payment method. Your integration can inspect the PaymentIntent to determine the status of the payment process, so that you can take business actions or respond to states that require further intervention.
+
+You can also use the Stripe Dashboard to configure your account to email you about payment status, such as successful payments. Change your [email notifications](https://docs.stripe.com/get-started/account/teams.md#email-notifications) in your [user settings](https://dashboard.stripe.com/settings/user).
+
+## Check PaymentIntent status on the client 
+
+When completing a payment on the client with the [confirmCardPayment](https://docs.stripe.com/js.md#stripe-confirm-card-payment) function, you can inspect the returned PaymentIntent to determine its current status:
+
+```javascript
+(async () => {
+  const {paymentIntent, error} = await stripe.confirmCardPayment(clientSecret);
+  if (error) {
+    // Handle error here
+  } else if (paymentIntent && paymentIntent.status === 'succeeded') {
+    // Handle successful payment here
+  }
+})();
+```
+
+The following are the possible outcomes of using the `confirmCardPayment` function:
+
+| **Event**                     | **What Happened**                                    | **Expected Integration**                                                   |
+| ----------------------------- | ---------------------------------------------------- | -------------------------------------------------------------------------- |
+| Resolves with a PaymentIntent | The customer completed payment on your checkout page | Inform the customer that their payment succeeded                           |
+| Resolves with an error        | The customer’s payment failed on your checkout page  | Display an error message and prompt your customer to attempt payment again |
+
+The promise returned by `confirmCardPayment` resolves when the payment process has either completed or failed with an error. When it completes successfully and returns a PaymentIntent, the status is always `succeeded` (or `requires_capture` if [capturing later](https://docs.stripe.com/payments/place-a-hold-on-a-payment-method.md)). When the payment requires an additional step such as authentication, the promise doesn’t resolve until that step is either complete or has timed out.
+
+## Check PaymentIntent status on the client without using confirmCardPayment 
+
+To check the status of a PaymentIntent without using the `confirmCardPayment` function, retrieve it independently by using the [retrievePaymentIntent](https://docs.stripe.com/js/payment_intents/retrieve_payment_intent) function and passing in the *client secret* (The client secret is a unique key returned from Stripe as part of a PaymentIntent. This key lets the client access important fields from the PaymentIntent (status, amount, currency) while hiding sensitive ones (metadata, customer)).
+
+```javascript
+(async () => {
+  const {paymentIntent} = await stripe.retrievePaymentIntent(clientSecret);
+  if (paymentIntent && paymentIntent.status === 'succeeded') {
+    // Handle successful payment here
+  } else {
+    // Handle unsuccessful, processing, or canceled payments and API errors here
+  }
+})();
+```
+
+The following are some [possible statuses](https://docs.stripe.com/api/payment_intents/object.md#payment_intent_object-status) of the PaymentIntent following a confirmation:
+
+| **What Happened**                                    | **Expected PaymentIntent Status** |
+| ---------------------------------------------------- | --------------------------------- |
+| The customer completed payment on your checkout page | `succeeded`                       |
+| The customer didn’t complete the checkout            | `requires_action`                 |
+| The customer’s payment failed on your checkout page  | `requires_payment_method`         |
+
+[Read more about the PaymentIntent statuses](https://docs.stripe.com/payments/paymentintents/lifecycle.md).
+
+## Monitor a PaymentIntent with webhooks 
+
+Stripe can send *webhook* (A webhook is a real-time push notification sent to your application as a JSON payload through HTTPS requests) events to your server to notify you when the status of a PaymentIntent changes, which you can use for purposes such as determining when to fulfill goods and services.
+
+Don’t attempt to handle order *fulfillment* (Fulfillment is the process of providing the goods or services purchased by a customer, typically after payment is collected) on the client side because customers can leave the page after payment is complete but before the fulfillment process initiates. Instead, use webhooks to monitor the `payment_intent.succeeded` event and handle its completion asynchronously instead of attempting to initiate fulfillment on the client side.
+
+> It’s technically possible to use polling instead of webhooks to monitor for changes caused by asynchronous operations—repeatedly retrieving a PaymentIntent so that you can check its status—but doing so is much less reliable and might cause rate limiiting issues. Stripe enforces [rate limiting](https://docs.stripe.com/testing.md#rate-limits) on API requests, so exercise caution if you decide to use polling.
+
+To handle a webhook event, create a route on your server and configure a corresponding webhook endpoint [in the Dashboard](https://dashboard.stripe.com/account/webhooks). Stripe sends the `payment_intent.succeeded` event when a payment succeeds, and the `payment_intent.payment_failed` event when a payment fails.
+
+The webhook payload includes the PaymentIntent object. The following example shows how to handle both events:
+
+#### Node.js
+
+```javascript
+app.use(require('body-parser').text({type: '*/*'}));
+
+const endpointSecret = 'whsec_...';
+
+app.post('/webhook', function(request, response) {
+  const sig = request.headers['stripe-signature'];
+  const body = request.body;
+
+  let event = null;
+
+  try {
+    event = stripe.webhooks.constructEvent(request.body, sig, endpointSecret);
+  } catch (err) {
+    // invalid signature
+    response.status(400).end();
+    return;
+  }
+
+  let intent = null;
+  switch (event['type']) {
+    case 'payment_intent.succeeded':
+      intent = event.data.object;
+      console.log("Succeeded:", intent.id);
+      break;
+    case 'payment_intent.payment_failed':
+      intent = event.data.object;
+      const message = intent.last_payment_error && intent.last_payment_error.message;
+      console.log('Failed:', intent.id, message);
+      break;
+  }
+
+  response.sendStatus(200);
+});
+```
+
+When payment is unsuccessful, you can find more details by inspecting the PaymentIntent’s `last_payment_error` property. You can notify the customer that their payment didn’t complete and encourage them to try again with a different payment method. Reuse the same PaymentIntent to continue tracking the customer’s purchase.
+
+### Handling specific webhook events 
+
+The following list describes how to handle webhook events:
+
+| Event                       | Description                                                                                                                                                                                                    | Next steps                                                                                                       |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `processing`                | The customer’s payment was submitted to Stripe successfully. Only applicable to payment methods with [delayed success confirmation](https://docs.stripe.com/payments/payment-methods.md#payment-notification). | Wait for the initiated payment to succeed or fail.                                                               |
+| `succeeded`                 | The customer’s payment succeeded.                                                                                                                                                                              | Fulfill the purchased goods or services.                                                                         |
+| `amount_capturable_updated` | The customer’s payment is authorized and ready for capture.                                                                                                                                                    | Capture the funds that are available for payment.                                                                |
+| `payment_failed`            | The customer’s payment was declined by a card network or otherwise expired.                                                                                                                                    | Reach out to your customer through email or push notification and prompt them to provide another payment method. |
+
+To test webhooks locally, you can use [Stripe CLI](https://docs.stripe.com/stripe-cli.md). After you install it, you can forward events to your server:
+
+```bash
+stripe listen --forward-to localhost:4242/webhook
+Ready! Your webhook signing secret is '{{WEBHOOK_SIGNING_SECRET}}' (^C to quit)
+```
+
+Learn more about [setting up webhooks](https://docs.stripe.com/webhooks.md).
+
+## Identifying charges on a PaymentIntent 
+
+When you attempt to collect payment from a customer, the PaymentIntent creates a [Charge](https://docs.stripe.com/api/charges.md). To get the ID of the most recent charge, inspect the PaymentIntent’s [latest_charge](https://docs.stripe.com/api/payment_intents/object.md#payment_intent_object-latest_charge) property:
+
+#### Node.js
+
+```javascript
+
+// Don't put any keys in code. See https://docs.stripe.com/keys-best-practices.
+// Find your keys at https://dashboard.stripe.com/apikeys.
+const stripe = require('stripe')('<<YOUR_SECRET_KEY>>');
+
+const intent = await stripe.paymentIntents.retrieve('{{PAYMENT_INTENT_ID}}');
+const latest_charge = intent.latest_charge;
+```
+
+To view all of the charges associated with a PaymentIntent, including any unsuccessful charges, [list all charges](https://docs.stripe.com/api/charges/list.md#list_charges-payment_intent) and specify the `payment_intent​` parameter.
+
+```node
+// Don't put any keys in code. See https://docs.stripe.com/keys-best-practices.
+// Find your keys at https://dashboard.stripe.com/apikeys.
+const stripe = require('stripe')('<<YOUR_SECRET_KEY>>');
+
+const charges = await stripe.charges.list({
+  payment_intent: '{{PAYMENTINTENT_ID}}',
+});
+```
+
+## Handling next actions 
+
+Some payment methods require additional steps, such as authentication, to complete the payment process. Stripe.js handles these automatically when confirming the PaymentIntent, but if you have an advanced integration, you might want to handle these manually.
+
+The PaymentIntent’s [next_action](https://docs.stripe.com/api/payment_intents/object.md#payment_intent_object-next_action) property exposes the next step that your integration must handle to complete the payment. The type of possible next actions can differ between various payment methods. You can find a full list of possible next actions in the [API documentation](https://docs.stripe.com/api.md#payment_intent_object-next_action-type).
+
+You can refer to the [payment methods documentation](https://docs.stripe.com/payments/payment-methods/overview.md) for more details about how to handle their required next actions.
+
+# ACH Direct Debit
+
+Learn how businesses can accept payments with ACH Direct Debit.
+
+There are two ways to accept US bank debits on Stripe: ACH Direct Debit and [Instant Bank Payments](https://docs.stripe.com/payments/link/instant-bank-payments.md). This guide describes ACH Direct Debit and helps you choose the best bank debit type for your business.
+
+*ACH* (Automated Clearing House (ACH) is a US financial network used for electronic payments and money transfers that doesn’t rely on paper checks, credit card networks, wire transfers, or cash) lets you accept payments from customers with a US bank account. ACH Direct Debit is a [reusable](https://docs.stripe.com/payments/payment-methods.md#usage), [delayed notification](https://docs.stripe.com/payments/payment-methods.md#payment-notification) payment method. It can take [up to 4 business days](https://docs.stripe.com/payments/ach-direct-debit.md#timing) to receive acknowledgement of success or failure. Because ACH Direct Debit isn’t a guaranteed payment method, there’s a risk of failed payments and [disputes](https://docs.stripe.com/payments/ach-direct-debit.md#disputed-payments).
+
+For information on payment method transaction fees, refer to [pricing details](https://stripe.com/pricing/local-payment-methods#ach-direct-debit).
+
+Accepting bank accounts is slightly different from accepting cards:
+
+1. Your customer must [authorize](https://docs.stripe.com/payments/ach-direct-debit.md#mandates) the payment terms.
+1. Bank accounts must be [verified](https://docs.stripe.com/payments/ach-direct-debit.md#verification).
+
+#### Payment method properties
+
+- **Customer locations**
+
+  US
+
+- **Presentment currency**
+
+  USD
+
+- **Payment confirmation**
+
+  Business-initiated
+
+- **Payment method family**
+
+  Bank debit
+
+- **Recurring payments**
+
+  Yes
+
+- **Payout timing**
+
+  2-5 days
+
+- **Connect support**
+
+  [Yes](https://docs.stripe.com/payments/ach-direct-debit.md#connect)
+
+- **Dispute support**
+
+  [Yes](https://docs.stripe.com/payments/ach-direct-debit.md#disputed-payments)
+
+- **Manual capture support**
+
+  No
+
+- **Refunds / Partial refunds**
+
+  [Yes / Yes](https://docs.stripe.com/payments/ach-direct-debit.md#refunds)
+
+#### Business locations
+
+Stripe accounts in the following countries can accept debit payments:
+
+- AT
+- BE
+- BG
+- CH
+- CY
+- CZ
+- DE
+- DK
+- EE
+- ES
+- FI
+- FR
+- GB
+- GI
+- GR
+- HR
+- HU
+- IE
+- IT
+- LI
+- LT
+- LU
+- LV
+- MT
+- NL
+- NO
+- PL
+- PT
+- RO
+- SE
+- SI
+- SK
+- US
+
+#### Product support
+
+- Connect
+- Checkout
+- Payment Links
+- Subscriptions
+- Invoicing
+- Elements1
+
+1Express Checkout Element doesn’t support ACH Direct Debit.
+
+## Payment flow 
+![](https://b.stripecdn.com/docs-statics-srv/assets/checkout.4af16ecfd4f0a3f4044c56d6100c4a42.svg)
+
+At checkout, the customer selects **ACH Direct Debit**.
+![](https://b.stripecdn.com/docs-statics-srv/assets/account-info.6df4a503f8d05d1d9ddd20a6f15172df.svg)
+
+The customer signs into their bank account to provide account information.
+![](https://b.stripecdn.com/docs-statics-srv/assets/redirect.f6e6ccf58078e0a25815560086204c24.svg)
+
+The business presents the mandate. The customer accepts it by completing the purchase.
+![](https://b.stripecdn.com/docs-statics-srv/assets/success.1ee3b6d34d944693e654e84f6d1be9f3.svg)
+
+The customer is notified when payment is complete.
+
+## Get started 
+
+If ACH is all you want, learn how to [accept a payment](https://docs.stripe.com/payments/ach-direct-debit/accept-a-payment.md) with ACH. Below are options to skip writing that code.
+
+### Dynamic payment methods
+
+You don’t have to integrate ACH Direct Debit and other payment methods individually. If you use our front-end products, Stripe automatically determines the most relevant payment methods to display. Go to the [Stripe Dashboard](https://dashboard.stripe.com/settings/payment_methods) and enable ACH Direct Debit. To get started with one of our hosted UIs, follow a quickstart:
+
+- [Checkout](https://docs.stripe.com/checkout/quickstart.md): Our prebuilt, hosted checkout page.
+- [Elements](https://docs.stripe.com/payments/quickstart-checkout-sessions.md): Our drop-in UI components.
+
+### Other payment products
+
+The following Stripe products also let you add ACH Direct Debit from the Dashboard:
+
+- [Invoicing](https://docs.stripe.com/invoicing/no-code-guide.md)
+- [Payment Links](https://docs.stripe.com/payment-links.md)
+- [Subscriptions](https://docs.stripe.com/billing/subscriptions/overview.md)
+
+### Manually add each payment method
+
+If you prefer to manually list payment methods or want to save ACH Direct Debit details for future payments, see the following guides:
+
+- [Manually configure ACH Direct Debit as a payment](https://docs.stripe.com/payments/ach-direct-debit/accept-a-payment.md)
+- [Save ACH Direct Debit details for future payments](https://docs.stripe.com/payments/ach-direct-debit/set-up-payment.md)
+
+## Timing
+
+With ACH Direct Debit, it can take time for funds to become available in your Stripe balance. The amount of time it takes for funds to become available is referred to as the settlement timing. The following tables describe the settlement timings for ACH Direct Debit payments that Stripe offers.
+
+You can access the `expected_debit_date` for ACH Direct Debit under [payment_method_details](https://docs.stripe.com/api/charges/object.md#charge_object-payment_method_details-us_bank_account-expected_debit_date) for [Charges](https://docs.stripe.com/api/charges/object.md). This is an estimated date of when the funds might be debited. This estimate isn’t guaranteed and the actual date might vary. This information is available in API responses and in [charge.updated](https://docs.stripe.com/api/events/types.md#event_types-charge.updated), [charge.succeeded](https://docs.stripe.com/api/events/types.md#event_types-charge.succeeded), and [charge.failed](https://docs.stripe.com/api/events/types.md#event_types-charge.failed) webhook events when the debit date can be determined.
+
+Initial payments made from select bank accounts that use temporary account numbers with Financial Connections might be subject to settlement delays.
+
+| Settlement type           | Timing                                | Cutoff time      | Additional information                                                                                                                                                                                                                                                                                                                                 |
+| ------------------------- | ------------------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Standard settlement (T+4) | 4 business days from payment creation | 21:00 US/Eastern | After ACH Direct Debit payments settle to your Stripe account balance, we make payouts to your bank account according to your set payout schedule.                                                                                                                                                                                                     |
+| Faster settlement (T+2)   | 2 business days from payment creation | 14:00 US/Eastern | This option is available only to eligible US users. You can check your eligibility and activate this option on the [Payment methods settings](https://dashboard.stripe.com/settings/payment_methods). For more information on faster settlement, see the [Support](https://support.stripe.com/questions/two-day-settlement-for-ach-direct-debit) page. |
+![](https://b.stripecdn.com/docs-statics-srv/assets/settlement-timings.a7d03de51dbe6630245b69df27038ce1.svg)
+
+A diagram showing the two settlement timings for ACH Direct Debit: standard (4 days) and faster (2 days).
+
+For information on how to cancel payments, see [Refund and cancel payments](https://docs.stripe.com/refunds.md#cancel-payment).
+
+## Transaction failures
+
+ACH Direct Debit transactions can fail any time after the payment is initiated through payment confirmation. These failures can occur for a number of reasons, such as:
+
+- Insufficient funds
+- An invalid account number
+- A customer disabling debits from their bank account
+
+If a payment fails after funds have been made available in your Stripe balance, Stripe immediately removes funds from your Stripe account.
+
+In rare situations, Stripe might receive an ACH failure from the bank after a PaymentIntent has transitioned to `succeeded`. If this happens, Stripe creates a dispute with a `reason` of:
+
+- `insufficient_funds`
+- `incorrect_account_details`
+- `bank_cannot_process`
+
+Stripe charges a failure fee in this situation.
+
+## Verification
+
+Learn about [validation and verification](https://support.stripe.com/questions/nacha-bank-account-validation-rule) requirements.
+
+Stripe lets your customers securely share their financial data by linking their financial accounts to your business. Use [Financial Connections](https://docs.stripe.com/financial-connections.md) to access customer-permissioned financial data such as tokenized account and routing numbers, balance data, ownership details, and transaction data.
+
+Your customers might enter their bank account manually instead of authenticating with Stripe Financial Connections. In these cases, Stripe provides a fully-hosted flow for collecting bank account details and verifies them with microdeposits. Customers have 10 days to verify their bank account with microdeposits. If they don’t verify within this timeframe, the PaymentIntent or SetupIntent reverts to requiring new payment method details.
+
+When you use [Stripe.js](https://docs.stripe.com/payments/elements.md), our JavaScript library for building payment flows, Stripe provides a fully-hosted collection of bank account details, instant bank verification, and (if needed) delayed verification using microdeposits. This verification process is a requirement for many businesses, and it helps reduce payment failures and fraudulent activities.
+
+## Mandates 
+
+ACH Direct Debit rules require that you first get authorization from a customer to take payments before you can debit their bank account. To obtain authorization, you present a *mandate* (A written notice of authorization to debit a bank account, agreed to by the customer before the first debit) to them. This mandate specifies the terms for one-time or recurring payments. The customer must agree to this mandate before you can collect any payments from their bank account.
+
+> ACH Direct Debit mandates can become inactive, which renders the payment method unusable. This can occur for various reasons, such as when a customer disputes a payment, when certain payment failures occur, or when Stripe becomes aware that the payment method is no longer valid. For more information, see [Blocked bank accounts](https://docs.stripe.com/payments/ach-direct-debit/blocked-bank-accounts.md).
+
+When you use Stripe to initiate ACH transactions with your customers, make sure you have all the necessary authorizations and approvals from your customers for Stripe to transmit an ACH debit transaction to the customer’s bank account. The information you provide Stripe about each ACH transaction must be accurate and complete, including the name of your customer that authorized you to initiate the ACH transaction to their bank account.
+
+#### Types of mandates
+
+There are two types of mandates: online and offline.
+
+- **Online mandates**: Appear as part of the payment flow on a website. Customers accept online mandates through a user interface element, such as clicking an **Accept** or **Pay** button, or by checking a box.
+
+- **Offline mandates**: Require that you present the specific terms of the transaction to your customer in writing or over the phone. The customer accepts those terms when they sign the paper or verbally agree to the terms over the phone. See the [details on the offline mandate types](https://docs.stripe.com/payments/ach-direct-debit/sec-codes.md) Stripe supports.
+
+Stripe displays an online mandate on the payment page for you if you use one of the following hosted products:
+
+- Checkout
+- Payment Element
+- Hosted Invoices Page
+
+### Mandates for online custom payment forms
+
+For custom payment forms that directly integrate with the Payment Intents API, you must display the mandate terms on your payment page before confirming the PaymentIntent or SetupIntent.
+
+You only need to display a mandate the first time you collect a customer’s bank account.
+
+#### Recommended mandate text
+
+We recommend that you use the following mandate text for your online custom payment form. This text must include the customer’s name, bank account information, and the date. For details on displaying the correct business name for Connect users, see [merchant of record and statement descriptors](https://docs.stripe.com/payments/ach-direct-debit.md#connect-merchant-of-record).
+
+|  |
+|  |
+| By clicking [accept], you authorize Rocket Rides to debit the bank account specified above for any amount owed for charges arising from your use of Rocket Rides’ services and/or purchase of products from Rocket Rides, pursuant to Rocket Rides’ website and terms, until this authorization is revoked. You may amend or cancel this authorization at any time by providing notice to Rocket Rides with 30 (thirty) days notice. |
+
+If you plan to use the customer’s bank account for future payments with the [setup_future_usage](https://docs.stripe.com/api/payment_intents/create.md#create_payment_intent-setup_future_usage) parameter or by [saving bank details](https://docs.stripe.com/payments/ach-direct-debit/set-up-payment.md) for a future payment, also include:
+
+|  |
+|  |
+| If you use Rocket Rides’ services or purchase additional products periodically pursuant to Rocket Rides’ terms, you authorize Rocket Rides to debit your bank account periodically. Payments that fall outside of the regular debits authorized above will only be debited after your authorization is obtained. |
+
+> If you originate recurring preauthorized debits, you must disclose to your customers how these amounts are calculated or a range the customer can anticipate. You must also give your customer at least 7 calendar days notice if you change the timing of any recurring preauthorized debits.
+
+### Mandate and microdeposit emails 
+
+To comply with Nacha rules, you must provide each customer with an electronic or hard copy of the mandate. By default, if your customer provides a [billing email address](https://docs.stripe.com/api/payment_methods/object.md#payment_method_object-billing_details-email), Stripe automatically emails your customer the following information:
+
+- Confirmation of the mandate, per Nacha requirements.
+- Notification if Stripe needs to use microdeposits to verify your customer’s bank account. These notification emails link to a hosted verification page.
+
+#### Sending custom mandate notifications
+
+You can send custom mandate notifications to customers. To send custom mandate notifications:
+
+1. Turn off Stripe emails in the Stripe Dashboard [email settings](https://dashboard.stripe.com/settings/emails)
+1. Send a mandate confirmation email when you receive your customer’s bank account and mandate authorization.
+
+In the email, include the following information:
+
+- Authorization date
+- Account holder name
+- Financial institution
+- Routing number
+- Last four digits of the account number
+
+The following is a sample mandate confirmation email that you can send.
+
+|  |
+|  |
+| Agreement Date        | **June 28, 2021** |
+| Account Holder Name   | **Jenny Rosen**   |
+| Financial Institution | **Chase Bank**    |
+| Routing Number        | **021000021**     |
+| Account Number        | \******6789**     |
+
+|  |
+|  |
+| Thank you for signing up for direct debits from Rocket Rides. You have authorized Rocket Rides to debit the bank account specified above for any amount owed for charges arising from your use of Rocket Rides’ services and/or purchase of products from Rocket Rides, pursuant to Rocket Rides’ website and terms, until this authorization is revoked. You can amend or cancel this authorization at any time by providing notice to Rocket Rides with 30 (thirty) days notice. |
+
+If you collected the customer’s bank account for future payments with the [setup_future_usage](https://docs.stripe.com/api/payment_intents/create.md#create_payment_intent-setup_future_usage) parameter or by [saving bank details](https://docs.stripe.com/payments/ach-direct-debit/set-up-payment.md), also include:
+
+|  |
+|  |
+| You have authorized Rocket Rides to debit your bank account periodically if and when you use Rocket Rides’ services or purchase more than one of Rocket Rides’ products periodically pursuant to Rocket Rides’ terms. Payments that fall outside of the regular debits authorized above will only be debited after your authorization is obtained. |
+
+> If you choose to send custom emails, you also need to send microdeposit reminder emails. For detailed instructions, see [Custom microdeposit email and verification page](https://docs.stripe.com/payments/ach-direct-debit/accept-a-payment.md?web-or-mobile=web&payment-ui=direct-api#optional-send-custom-email-notifications).
+
+## Disputes 
+
+ACH Direct Debit provides a dispute process for bank account holders to dispute payments. Customers can generally dispute a payment through their bank for up to 60 calendar days after a debit on a personal account, or up to two business days for a business account. Disputes received within these timeframes are considered final and uncontestable through the ACH network.
+
+Consequently, you can’t challenge these disputes and must resolve them directly with your customers. In rare instances, a debit payment can be successfully disputed outside these timelines. This is called a late return. The late return process is primarily managed by and ultimately decided at the discretion of the banks involved in the transaction.
+
+When a dispute is created, Stripe sends both the [charge.dispute.created](https://docs.stripe.com/api/events/types.md#event_types-charge.dispute.created) and [charge.dispute.closed](https://docs.stripe.com/api/events/types.md#event_types-charge.dispute.closed) *webhook* (A webhook is a real-time push notification sent to your application as a JSON payload through HTTPS requests) events and deducts the amount of the dispute and associated dispute fee from your Stripe balance.
+
+Unlike credit card disputes, all ACH Direct Debit disputes are final with no process for appeal. If a customer successfully disputes a payment, you must contact them directly to resolve the situation. If you suspect that disputes are fraudulent, Stripe Radar might help you reduce risk.
+
+> If you proactively issue your customer a refund while the customer’s bank also initiates the dispute process, your customer might receive two credits for the same transaction. Follow the guidelines in the following section on refunds to avoid this situation.
+
+### Resolving disputes
+
+When a customer disputes an ACH Direct Debit payment, it invalidates the mandate associated with the payment method and you can’t reuse it. To attempt a charge again, you must resolve the dispute with the customer and [collect a new mandate authorization](https://docs.stripe.com/payments/ach-direct-debit/accept-a-payment.md#resolving-disputes).
+
+If they dispute a subsequent payment, Stripe blocks the bank account from further re-use. To learn more about resolution steps, see [Blocked bank accounts](https://docs.stripe.com/payments/ach-direct-debit/blocked-bank-accounts.md).
+
+### Requests for Proof of Authorization
+
+In some rare circumstances, a customer’s bank initiates an inquiry to request proof of authorization for an ACH Debit. If you use custom mandates through the [Payment Intents API](https://docs.stripe.com/api/payment_intents.md), Stripe creates a dispute inquiry for your business to provide evidence for the payment in question. If you use Stripe-hosted ACH mandates, Stripe automatically responds to the customer’s bank with a copy of the debit authorization.
+
+When Stripe receives an ACH Debit authorization inquiry, a [charge.dispute.created](https://docs.stripe.com/api/events/types.md#event_types-charge.dispute.created) event is triggered with the status `warning_needs_response` and a new dispute inquiry is shown in the Dashboard. To comply with Nacha rules, you must upload evidence of the customer’s authorization upon request.
+
+#### Evidence to submit for an ACH inquiry
+
+Here is the evidence you need to submit for an ACH inquiry:
+
+- **Mandate authorization (required)**: A copy of the authorization proving that the customer or bank account holder agreed to the debit on their bank account.
+- **Sales receipt**: Documentation of the goods or services purchased by the customer.
+- **Customer information**: Information on the customer’s identity proving that the accountholder authorized the payment and received the good or service.
+
+You can upload evidence through the Stripe Dashboard or the [Files API](https://docs.stripe.com/api/files.md). You can only submit evidence for a dispute inquiry *once*. If you don’t submit evidence before the deadline, the dispute is accepted and closed.
+
+##### Submit evidence through the Dashboard
+
+To submit evidence to contest a late return dispute through the Dashboard:
+
+1. Go to [the payments page](https://dashboard.stripe.com/payments) and look for a payment with an inquiry icon.
+1. Click **Respond to the inquiry**  to provide more details about the transaction. You can upload an image or PDF of the proof of authorization.
+
+##### Submit evidence through the Files API
+
+To submit evidence through the [Files API](https://docs.stripe.com/api/files.md), first [upload  the evidence files](https://docs.stripe.com/file-upload.md#uploading-a-file).
+
+#### Node.js
+
+```javascript
+
+// Don't put any keys in code. See https://docs.stripe.com/keys-best-practices.
+// Find your keys at https://dashboard.stripe.com/apikeys.
+const stripe = require('stripe')('<<YOUR_SECRET_KEY>>');
+
+const fp = fs.readFileSync('/path/to/a/file.jpg');
+const upload = await stripe.files.create({
+  file: {
+    data: fp,
+    name: 'file.jpg',
+    type: 'application/octet-stream',
+  },
+  purpose: 'dispute_evidence',
+});
+```
+
+Then, link the uploaded files to the dispute inquiry in the [Disputes API](https://docs.stripe.com/api/disputes/update.md#update_dispute-evidence) using the returned file `id`.
+
+```node
+// Don't put any keys in code. See https://docs.stripe.com/keys-best-practices.
+// Find your keys at https://dashboard.stripe.com/apikeys.
+const stripe = require('stripe')('<<YOUR_SECRET_KEY>>');
+
+const dispute = await stripe.disputes.update(
+  'YOUR_DISPUTE_ID',
+  {
+    evidence: {
+      uncategorized_file: 'file_id_123',
+    },
+    submit: true,
+  }
+);
+```
+
+You can provide additional information about the transaction using other [fields](https://docs.stripe.com/api/disputes/update.md#update_dispute-evidence) in the Disputes API.
+
+##### Post-submission
+
+After receiving evidence submissions, Stripe sends a [charge.dispute.updated](https://docs.stripe.com/api/events/types.md#event_types-charge.dispute.created) event and a message appears in your timeline confirming receipt of the evidence. After you submit evidence, the bank reviews the evidence and makes a determination. If the evidence is sufficient, the dispute inquiry closes in your favor and is marked as `won`. If the bank determines that the authorization is insufficient, the dispute closes and is marked as `lost`. Stripe doesn’t determine whether or not evidence of authorization is sufficient, and under Nacha rules, the bank may return the payment in its sole discretion.
+
+## Blocked bank accounts
+
+To comply with Nacha regulations, Stripe may block bank accounts when a blockable ACH return is received until we can confirm that the issue causing the returns has been resolved. When this happens, Stripe sends the [payment_method.automatically_updated](https://docs.stripe.com/api/events/types.md#event_types-payment_method.automatically_updated) event for all saved payment methods.
+
+Consuming these events can provide advance notice if your business model relies on recurring payments that need to be processed before a certain date. Inspect the event data for the `us_bank_account.status_details.blocked` field, then work with your customer to unblock or switch bank accounts before initiating future payments.
+
+You receive equivalent events when the block is removed, indicating that payment methods can be reused immediately if an active mandate exists or you re-collect one.
+
+For more information on blocked bank accounts and how to deal with them, see [Blocked bank accounts](https://docs.stripe.com/payments/ach-direct-debit/blocked-bank-accounts.md).
+
+## Refunds
+
+You have a maximum of 180 days from the date of the original payment to submit a refund for an ACH Direct Debit payment. Refunds require at least 3 business days to process. Stripe waits for the original payment to succeed before submitting the refund.
+
+> #### Avoid disputes
+> 
+> If you accidentally debit your customer, contact them immediately to avoid a payment dispute. Factors such as slightly longer settlement time periods and the way banks process ACH Direct Debit transactions can cause confusion between you, your customer, your customer’s bank, and Stripe. For example, your customer might contact both you and their bank to dispute a payment. If you proactively issue your customer a refund while the customer’s bank also initiates the dispute process, your customer might receive two credits for the same transaction, so it’s important to communicate with your customer about the processing time and the status of their refund.
+
+Stripe doesn’t explicitly label ACH Direct Debit refunds as refunds when we deposit the funds back to a customer’s bank account. Instead, we process refunds as a credit and include a reference to the statement descriptor for the original payment.
+
+## Statement descriptors for ACH
+
+Every ACH Direct Debit payment shows up on customers’ bank statements with the *name of the merchant*. For payments created with Stripe, the name of the merchant is your Stripe account’s [statement descriptor](https://docs.stripe.com/get-started/account/statement-descriptors.md). You can override this default behavior for every transaction independently by using a [dynamic statement descriptor](https://docs.stripe.com/payments/payment-intents.md#dynamic-statement-descriptor). To do so, specify the [statement_descriptor](https://docs.stripe.com/api/payment_intents/create.md#create_payment_intent-statement_descriptor) parameter when creating the `PaymentIntent`.
+
+> Your statement descriptor truncates to the first 16 alphanumeric characters on the bank statement. For example, if your statement descriptor is `ROCKETRIDESLIMITED`, the customer sees `ROCKETRIDESLIMIT`. Additionally, statement descriptors can’t use the special characters `<`, `>`, `'`, or `"`.
+
+The following table illustrates the *merchant name* behavior you can expect on the customer’s bank statement:
+
+| Default statement descriptor | Dynamic statement descriptor | Merchant name  | Bank statement descriptor |
+| ---------------------------- | ---------------------------- | -------------- | ------------------------- |
+| Rocket Rides                 | Unspecified                  | `Rocket Rides` | `Rocket Rides`            |
+| Rocket Rides                 | `Sunday Ride`                | `Rocket Rides` | `Sunday Ride`             |
+
+Each bank formats these fields differently. Depending on your customer’s bank, some fields might appear in all lowercase or all uppercase.
+
+## Connect
+
+If you use *Connect* (Connect is Stripe's solution for multi-party businesses, such as marketplace or software platforms, to route payments between sellers, customers, and other recipients), you must take the following into consideration before you enable and use ACH Direct Debits.
+
+### Request ACH Debit capabilities for your connected accounts
+
+Set the `us_bank_account_ach_payments` capability to `active` on your platform account, and for any connected accounts you want to enable for ACH debits. You can also [request more account capabilities](https://docs.stripe.com/connect/account-capabilities.md#requesting-unrequesting).
+
+> Stripe automatically refunds the application fee to your platform account when the [destination charge](https://docs.stripe.com/connect/charges.md#destination) for an ACH debit fails. Learn about [fees for failed payments](https://stripe.com/pricing/local-payment-methods#ach-direct-debit).
+
+### Merchant of record and statement descriptors 
+
+The [charge type](https://docs.stripe.com/connect/charges.md) of Connect payments might change the default statement descriptor and the merchant name that appears on the customer’s bank statement. The charge type can also change:
+
+- The *merchant of record* (The legal entity responsible for facilitating the sale of products to a customer that handles any applicable regulations and liabilities, including sales taxes. In a Connect integration, it can be the platform or a connected account) shown on the mandate
+- The business shown on confirmation emails
+- The business shown on microdeposit reminder emails
+
+The merchant of record determines the Stripe account authorized to create payments with a particular [PaymentMethod](https://docs.stripe.com/api/payment_methods/object.md). To learn more about sharing this authorization across multiple connected accounts, see [PaymentMethod and Mandate cloning](https://docs.stripe.com/payments/ach-direct-debit.md#payment-method-and-mandate-cloning).
+
+| Charge type                                        | Descriptor taken from |
+| -------------------------------------------------- | --------------------- |
+| Direct                                             | Connected Account     |
+| Destination                                        | Platform              |
+| Separate charge and transfer                       | Platform              |
+| Destination (with `on_behalf_of`)                  | Connected Account     |
+| Separate charge and transfer (with `on_behalf_of`) | Connected Account     |
+
+### PaymentMethod and mandate cloning 
+
+You can collect customer bank accounts on the platform account and [clone](https://docs.stripe.com/connect/direct-charges-multiple-accounts.md#clone-and-create-direct-charges) ACH Direct Debit payment methods. Cloning these methods allows you to save customer bank accounts for later use on connected accounts. When you clone ACH Direct Debit payment methods, Stripe duplicates the mandate authorization to the connected account, but we don’t send any new mandate confirmation emails.
+
+> If a mandate is authorized for a PaymentIntent or SetupIntent [on_behalf_of](https://docs.stripe.com/connect/charges.md#on_behalf_of) a connected account, you can’t use that mandate with a different connected account.
+
+When collecting a bank account that you intend to clone to connected accounts, you must communicate to the customer that their authorization extends to connected accounts on your platform. For example, you can communicate this message to a customer through the mandate terms. Failure to communicate this message to your customers could result in customer confusion and increase the risk of disputed payments.
+
+### Connect and settlement
+
+Settlement speed is generally controlled at the platform level. The table below shows a comprehensive view of settlement timing by account and charge type.
+
+| Account Type                          | Direct Charges                                       | Destination Charges                                  | Separate Charges and Transfers              |
+| ------------------------------------- | ---------------------------------------------------- | ---------------------------------------------------- | ------------------------------------------- |
+| **Standard with Platform Control**    | The platform controls the settlement speed.          | The platform controls the settlement speed.          | The platform controls the settlement speed. |
+| **Standard without Platform Control** | The connected account controls the settlement speed. | The connected account controls the settlement speed. | The platform controls the settlement speed. |
+| **Express**                           | The platform controls the settlement speed.          | The platform controls the settlement speed.          | The platform controls the settlement speed. |
+| **Custom**                            | The platform controls the settlement speed.          | The platform controls the settlement speed.          | The platform controls the settlement speed. |
+
+## Testing ACH
+
+Learn how to test scenarios with instant verifications using [Financial Connections](https://docs.stripe.com/financial-connections/testing.md#web-how-to-use-test-accounts).
+
+### Send transaction emails in a sandbox
+
+After you collect the bank account details and accept a mandate, send the mandate confirmation and microdeposit verification emails in a *sandbox* (A sandbox is an isolated test environment that allows you to test Stripe functionality in your account without affecting your live integration. Use sandboxes to safely experiment with new features and changes).
+
+If your domain is **{domain}** and your username is **{username}**, use the following email format to send test transaction emails: **{username}+test\_email@{domain}**.
+
+For example, if your domain is **example.com** and your username is **info**, use the format **info+test\_email@example.com** for testing ACH Direct Debit payments. This format ensures that emails route correctly. If you don’t include the **+test\_email** suffix, we won’t send the email.
+
+> You need to [activate your Stripe account](https://docs.stripe.com/get-started/account/activate.md) before you can trigger these emails while testing.
+
+### Test account numbers
+
+Stripe provides several test account numbers and corresponding tokens you can use to make sure your integration for manually-entered bank accounts is ready for production.
+
+| Account number | Token                                  | Routing number | Behavior                                                                                                                                              |
+| -------------- | -------------------------------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `000123456789` | `pm_usBankAccount_success`             | `110000000`    | The payment succeeds.                                                                                                                                 |
+| `000111111113` | `pm_usBankAccount_accountClosed`       | `110000000`    | The payment fails because the account is closed.                                                                                                      |
+| `000000004954` | `pm_usBankAccount_riskLevelHighest`    | `110000000`    | The payment is blocked by Radar due to a [high risk of fraud](https://docs.stripe.com/radar/risk-evaluation.md#high-risk).                            |
+| `000111111116` | `pm_usBankAccount_noAccount`           | `110000000`    | The payment fails because no account is found.                                                                                                        |
+| `000222222227` | `pm_usBankAccount_insufficientFunds`   | `110000000`    | The payment fails due to insufficient funds.                                                                                                          |
+| `000333333335` | `pm_usBankAccount_debitNotAuthorized`  | `110000000`    | The payment fails because debits aren’t authorized.                                                                                                   |
+| `000444444440` | `pm_usBankAccount_invalidCurrency`     | `110000000`    | The payment fails due to invalid currency.                                                                                                            |
+| `000666666661` | `pm_usBankAccount_failMicrodeposits`   | `110000000`    | The payment fails to send microdeposits.                                                                                                              |
+| `000555555559` | `pm_usBankAccount_dispute`             | `110000000`    | The payment triggers a dispute.                                                                                                                       |
+| `000000000009` | `pm_usBankAccount_processing`          | `110000000`    | The payment stays in processing indefinitely. Useful for testing [PaymentIntent cancellation](https://docs.stripe.com/api/payment_intents/cancel.md). |
+| `000777777771` | `pm_usBankAccount_weeklyLimitExceeded` | `110000000`    | The payment fails due to payment amount causing the account to exceed its weekly payment volume limit.                                                |
+| `000888888885` |                                        | `110000000`    | The payment fails because of  a deactivated [tokenized account number](https://docs.stripe.com/financial-connections/tokenized-account-numbers.md).   |
+
+Before test transactions can complete, you need to verify all test accounts that automatically succeed or fail the payment. To do so, use the test microdeposit amounts or descriptor codes below.
+
+### Test microdeposit amounts and descriptor codes
+
+To mimic different scenarios, use these microdeposit amounts *or* 0.01 descriptor code values.
+
+| Microdeposit values | 0.01 descriptor code values | Scenario                                                         |
+| ------------------- | --------------------------- | ---------------------------------------------------------------- |
+| `32` and `45`       | SM11AA                      | Simulates verifying the account.                                 |
+| `10` and `11`       | SM33CC                      | Simulates exceeding the number of allowed verification attempts. |
+| `40` and `41`       | SM44DD                      | Simulates a microdeposit timeout.                                |
+
+### Test settlement behavior
+
+Test transactions settle instantly and are added to your available test balance. This behavior differs from livemode, where transactions can take [multiple days](https://docs.stripe.com/payments/ach-direct-debit.md#timing) to settle in your available balance.
+
+## US bank debit comparison
+
+| Option                                                                                    | Confirmation time     | Payment failure protection                                                                                                         | Additional information                                                                                                                                                                                                                                                       |
+| ----------------------------------------------------------------------------------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Instant Bank Payments](https://docs.stripe.com/payments/link/instant-bank-payments.md)   | Instant               | Bank-initiated returns guaranteed by Stripe                                                                                        | For businesses looking for instant confirmation and faster settlement, Instant Bank Payments provides a card-like payment flow with the cost savings of bank debits. Instant Bank Payments are available only as a part of [Link](https://docs.stripe.com/payments/link.md). |
+| [ACH Direct Debit](https://docs.stripe.com/payments/ach-direct-debit.md#ach-direct-debit) | Up to 4 business days | Use [Financial Connections](https://docs.stripe.com/financial-connections/ach-direct-debit-payments.md) data to optimize payments. | For businesses that don’t need instant confirmation, ACH Direct Debit has lower costs than Instant Bank Payments. ACH Direct Debit is popular for businesses with large or recurring transactions.                                                                           |
+
+## Fraud Protection for ACH with Radar
+
+[Stripe Radar](https://stripe.com/radar) provides fraud protection capabilities for ACH Direct Debits without any additional development time, performing real-time evaluation using machine learning algorithms to help identify and block high-risk transactions. Our machine learning trains specifically for ACH, so it’s effective at detecting fraud that might be unique to ACH Direct Debit payments.
+
+For Radar users, Radar might be on by default for all supported payment methods.
+
+## Billing Retries 
+
+Enable [Direct Debit retries](https://docs.stripe.com/billing/revenue-recovery/smart-retries.md#direct-debit-retries) to have Stripe automatically retry failed Direct Debit payments caused by insufficient funds. You can turn on retries for [recurring subscription invoices](https://dashboard.stripe.com/revenue_recovery/retries), [one-off invoices](https://dashboard.stripe.com/settings/billing/invoices/general), or both.
+
+Stripe can automatically retry each failed ACH Direct Debit payment a maximum of 2 times, no more than 40 days after the original payment attempt.
+
+## See also
+
+- [Blocked bank accounts](https://docs.stripe.com/payments/ach-direct-debit/blocked-bank-accounts.md)
+
+# Fulfill orders
+
+Learn how to fulfill payments received with the Checkout Sessions API.
+
+# Hosted page
+
+> This is a Hosted page for when payment-ui is stripe-hosted. View the full page at https://docs.stripe.com/checkout/fulfillment?payment-ui=stripe-hosted.
+
+When you receive a payment with the Checkout Sessions API (including Payment Links), you might need to take action to provide your customer with what they paid for. For example, you might need to grant them access to a service, or you might need to ship them physical goods. This process is known as fulfillment, and you have two ways to handle this process:
+
+- **Manually**: You can manually fulfill orders using information that Stripe makes available to you. For example, you can monitor the [Dashboard](https://docs.stripe.com/dashboard/basics.md), check payment notification emails, or look at reports and then fulfill orders.
+- **Automatically**: You can build an automated fulfillment system. (Recommended)
+
+The first option works for low volume or experimental ventures, but for most situations we recommend automating fulfillment. The rest of this guide shows you how to build an automatic fulfillment system.
+
+## Automatic fulfillment 
+
+The automatic fulfillment system outlined below uses a combination of *webhooks* (A webhook is a real-time push notification sent to your application as a JSON payload through HTTPS requests) and a redirect to your website to trigger fulfillment. You must use webhooks to make sure fulfillment happens for every payment, and redirects let your customers access services or fulfillment details immediately after paying.
+
+> Payment Links use Checkout, so all of the information below applies to both Payment Links and Checkout unless otherwise noted.
+
+## Create a fulfillment function [Server-side]
+
+Create a function on your server to fulfill successful payments. Webhooks trigger this function, and it’s called when customers are sent to your website after completing checkout. This guide refers to this function as `fulfill_checkout`, but you can name the function whatever you wish.
+
+Perform fulfillment only once per payment. Because of how this integration and the internet work, your `fulfill_checkout` function might be called multiple times, possibly concurrently, for the same Checkout Session. Performing checkout only once ensures this won’t cause undesired behavior.
+
+Your `fulfill_checkout` function must:
+
+1. Correctly handle being called multiple times with the same Checkout Session ID.
+1. Accept a *Checkout Session* (A Checkout Session represents your customer's session as they pay for one-time purchases or subscriptions through Checkout. After a successful payment, the Checkout Session contains a reference to the Customer, and either the successful PaymentIntent or an active Subscription) ID as an argument.
+1. Retrieve the Checkout Session from the API with the [line_items](https://docs.stripe.com/api/checkout/sessions/object.md#checkout_session_object-line_items) property [expanded](https://docs.stripe.com/api/expanding_objects.md).
+1. Check the [payment_status](https://docs.stripe.com/api/checkout/sessions/object.md#checkout_session_object-payment_status) property to determine if it requires fulfillment.
+1. Perform fulfillment of the line items.
+1. Record fulfillment status for the provided Checkout Session.
+
+Use the code below as a starting point for your `fulfill_checkout` function. The `TODO` comments indicate any functionality you must implement.
+
+> The code snippets below might name the `fulfill_checkout` function `fulfillCheckout` or `FulfillCheckout` depending on the language selected, but they all represent the same function.
+
+#### Node.js
+
+```node
+async function fulfillCheckout(sessionId) {
+  // Don't put any keys in code. See https://docs.stripe.com/keys-best-practices.
+  // Find your keys at https://dashboard.stripe.com/apikeys.
+  const stripe = require('stripe')('<<YOUR_SECRET_KEY>>');
+
+  console.log('Fulfilling Checkout Session ' + sessionId);
+
+  // TODO: Make this function safe to run multiple times,
+  // even concurrently, with the same session ID
+
+  // TODO: Make sure fulfillment hasn't already been
+  // performed for this Checkout Session
+
+  // Retrieve the Checkout Session from the API with line_items expanded
+  const checkoutSession = await stripe.checkout.sessions.retrieve(sessionId, {
+    expand: ['line_items'],
+  });
+
+  // Check the Checkout Session's payment_status property
+  // to determine if fulfillment should be performed
+  if (checkoutSession.payment_status !== 'unpaid') {
+    // TODO: Perform fulfillment of the line items
+
+    // TODO: Record/save fulfillment status for this
+    // Checkout Session
+  }
+}
+```
+
+> If a Checkout Session has many line items, use [auto-pagination](https://docs.stripe.com/api/pagination/auto.md) with the [API for Checkout line items](https://docs.stripe.com/api/checkout/sessions/line_items.md) to retrieve all of them.
+
+Depending on the payment methods you accept and your business needs, you might want to have your `fulfill_checkout` function do the following:
+
+- Provision access to services.
+- Trigger shipment of goods.
+- Save a copy of the payment details and line items in your own database.
+- Send the customer a custom receipt email if you don’t have [Stripe’s receipts](https://docs.stripe.com/receipts.md) enabled.
+- Reconcile line items and quantities purchased if you allow customers to adjust quantities in Checkout.
+- Update inventory or stock records.
+
+## Create a payment event handler [Server-side]
+
+To trigger fulfillment, create a webhook event handler to listen for payment events and trigger your `fulfill_checkout` function.
+
+When someone pays you, it creates a `checkout.session.completed` event. Set up an endpoint on your server to accept, process, and confirm receipt of these events.
+
+### Immediate versus delayed payment methods
+
+Some payment methods aren’t [instant](https://docs.stripe.com/payments/payment-methods.md#payment-notification), such as [ACH direct debit](https://docs.stripe.com/payments/ach-direct-debit.md) and other bank transfers. This means, funds won’t be immediately available when Checkout completes. Delayed payment methods generate a [checkout.session.async_payment_succeeded](https://docs.stripe.com/api/events/types.md#event_types-checkout.session.async_payment_succeeded) event when payment succeeds later. The status of the object is in processing until the payment status either succeeds or fails.
+
+> The webhook secret (`whsec_...`) shown in the code below comes from either the Stripe CLI or your webhook endpoint. You can use the Stripe CLI for local testing, and Stripe uses a webhook endpoint to send events to your handler when it’s running on a server. See the next section for more details.
+
+#### Node.js
+
+```javascript
+// Use the secret provided by Stripe CLI for local testing
+// or your webhook endpoint's secret.
+const endpointSecret = 'whsec_...';
+
+// Using Express
+const app = require('express')();
+
+// Use body-parser to retrieve the raw body as a buffer
+const bodyParser = require('body-parser');
+
+app.post('/webhook', bodyParser.raw({type: 'application/json'}), async (request, response) => {
+  const payload = request.body;
+  const sig = request.headers['stripe-signature'];
+
+  let event;
+
+  try {
+    event = stripe.webhooks.constructEvent(payload, sig, endpointSecret);
+  } catch (err) {
+    return response.status(400).send(`Webhook Error: ${err.message}`);
+  }
+if (
+    event.type === 'checkout.session.completed'
+    || event.type === 'checkout.session.async_payment_succeeded'
+  ) {
+    fulfillCheckout(event.data.object.id);
+  }
+
+  response.status(200).end();
+});
+
+app.listen(4242, () => console.log('Running on port 4242'));
+```
+
+You might also want to listen for and handle `checkout.session.async_payment_failed` events. For example, you can send an email to your customer when a delayed payment fails.
+
+## Test your event handler locally
+
+The quickest way to develop and test your webhook event handler is with the [Stripe CLI](https://docs.stripe.com/stripe-cli.md). If you don’t have the Stripe CLI, follow the [install guide](https://docs.stripe.com/stripe-cli/install.md) to get started.
+
+When the Stripe CLI is installed, you can test your event handler locally. Run your server (for example, on `localhost:4242`), then run the [stripe listen](https://docs.stripe.com/cli/listen) command to have the Stripe CLI forward events to your local server:
+
+```bash
+stripe listen --forward-to localhost:4242/webhook
+
+Ready! Your webhook signing secret is 'whsec_<REDACTED>' (^C to quit)
+```
+
+Add the webhook secret (`whsec_...`) to your event handling code, then test fulfillment by going through Checkout as a customer:
+
+- Press the checkout button that takes you to Checkout, or visit your Payment Link
+- Provide the following test data in Checkout:
+  - Enter `4242 4242 4242 4242` as the card number
+  - Enter any future date for card expiry
+  - Enter any 3-digit number for CVV
+  - Enter any billing postal code (`90210`)
+- Press the **Pay** button
+
+When the payment completes, verify the following:
+
+- On your command line, where `stripe listen` is running, it shows a `checkout.session.completed` event forwarded to your local server.
+- Your server logs show the expected output from your `fulfill_checkout` function.
+
+## Create a webhook endpoint
+
+After testing locally, get your webhook event handler up and running on your server. Next, [create a webhook endpoint](https://docs.stripe.com/webhooks.md#register-webhook) to send `checkout.session.completed` events to your server, then test the Checkout flow again.
+
+## Configure a landing page URL [Recommended]
+
+Configure Checkout to send your customer to a page on your website after they complete Checkout. Include the `{CHECKOUT_SESSION_ID}` placeholder in your page’s URL, which is replaced with the Checkout Session ID when your customer is redirected from Checkout.
+
+### Hosted Checkout 
+
+For Checkout Sessions with the default [ui_mode](https://docs.stripe.com/api/checkout/sessions/create.md#create_checkout_session-ui_mode) of `hosted_page`, set the `success_url`.
+
+```node
+// Don't put any keys in code. See https://docs.stripe.com/keys-best-practices.
+// Find your keys at https://dashboard.stripe.com/apikeys.
+const stripe = require('stripe')('<<YOUR_SECRET_KEY>>');
+
+const session = await stripe.checkout.sessions.create({
+  line_items: [
+    {
+      price: '{{PRICE_ID}}',
+      quantity: 1,
+    },
+  ],
+  mode: 'payment',
+  success_url: 'https://example.com/after-checkout?session_id={CHECKOUT_SESSION_ID}',
+});
+```
+
+When you have a webhook endpoint set up to listen for `checkout.session.completed` events and you set a `success_url`, Checkout waits up to 10 seconds for your server to respond to the webhook event delivery before redirecting your customer. If you use this approach, make sure your server responds to `checkout.session.completed` events as quickly as possible. If you’re using the Stripe CLI for local testing, Checkout redirects to the `success_url` immediately.
+
+This behavior isn’t supported for webhook endpoints registered in an [organization](https://docs.stripe.com/get-started/account/orgs.md) account. Stripe doesn’t wait for organization webhook endpoints that listen to `checkout.session.completed` to respond when redirecting Checkout customers.
+
+### Payment Links 
+
+For Payment Links you create with the API, set the [after_completion.redirect.url](https://docs.stripe.com/api/payment-link/create.md#create_payment_link-after_completion-redirect-url).
+
+```node
+// Don't put any keys in code. See https://docs.stripe.com/keys-best-practices.
+// Find your keys at https://dashboard.stripe.com/apikeys.
+const stripe = require('stripe')('<<YOUR_SECRET_KEY>>');
+
+const paymentLink = await stripe.paymentLinks.create({
+  line_items: [
+    {
+      price: '{{PRICE_ID}}',
+      quantity: 1,
+    },
+  ],
+  after_completion: {
+    type: 'redirect',
+    redirect: {
+      url: 'https://example.com/after-checkout?session_id={CHECKOUT_SESSION_ID}',
+    },
+  },
+});
+```
+
+For Payment Links you [create in the Dashboard](https://dashboard.stripe.com/payment-links/create):
+
+1. Go to the **After Payment** tab.
+1. Select **Don’t show confirmation page**.
+1. Provide the URL to your landing page that includes the `{CHECKOUT_SESSION_ID}` placeholder (for example, `https://example.com/after-checkout?session_id={CHECKOUT_SESSION_ID}`)
+
+## Trigger fulfillment on your landing page [Recommended]
+
+[Listening to webhooks](https://docs.stripe.com/checkout/fulfillment.md#create-payment-event-handler) is required to make sure you always trigger fulfillment for every payment, but webhooks can sometimes be delayed. To optimize your payment flow and guarantee immediate fulfillment when your customer is present, trigger fulfillment from your landing page as well.
+
+Use the Checkout Session ID from the URL you specified in the previous step to do the following:
+
+1. When your server receives a request for your Checkout landing page, extract the Checkout Session ID from the URL.
+1. Run your `fulfill_checkout` function with the ID provided.
+1. Render the page after the fulfillment attempt is complete.
+
+When you render your landing page you can display the following:
+
+- Details from the fulfillment process.
+- Links or information about services the customer now has access to.
+- Shipping or logistical details for physical goods.
+
+> #### Webhooks are required
+> 
+> You can’t rely on triggering fulfillment only from your Checkout landing page, because your customers aren’t guaranteed to visit that page. For example, someone can pay successfully in Checkout and then lose their connection to the internet before your landing page loads.
+> 
+> [Set up a webhook event handler](https://docs.stripe.com/checkout/fulfillment.md#create-payment-event-handler) so Stripe can send payment events directly to your server, bypassing the client entirely. Webhooks provide the most reliable way to confirm when you get paid. If webhook event delivery fails, Stripe [retries multiple times](https://docs.stripe.com/webhooks.md#automatic-retries).
+
+
+# Embedded page
+
+> This is a Embedded page for when payment-ui is embedded-form. View the full page at https://docs.stripe.com/checkout/fulfillment?payment-ui=embedded-form.
+
+When you receive a payment with the Checkout Sessions API (including Payment Links), you might need to take action to provide your customer with what they paid for. For example, you might need to grant them access to a service, or you might need to ship them physical goods. This process is known as fulfillment, and you have two ways to handle this process:
+
+- **Manually**: You can manually fulfill orders using information that Stripe makes available to you. For example, you can monitor the [Dashboard](https://docs.stripe.com/dashboard/basics.md), check payment notification emails, or look at reports and then fulfill orders.
+- **Automatically**: You can build an automated fulfillment system. (Recommended)
+
+The first option works for low volume or experimental ventures, but for most situations we recommend automating fulfillment. The rest of this guide shows you how to build an automatic fulfillment system.
+
+## Automatic fulfillment 
+
+The automatic fulfillment system outlined below uses a combination of *webhooks* (A webhook is a real-time push notification sent to your application as a JSON payload through HTTPS requests) and a redirect to your website to trigger fulfillment. You must use webhooks to make sure fulfillment happens for every payment, and redirects let your customers access services or fulfillment details immediately after paying.
+
+## Create a fulfillment function [Server-side]
+
+Create a function on your server to fulfill successful payments. Webhooks trigger this function, and it’s called when customers are sent to your website after completing checkout. This guide refers to this function as `fulfill_checkout`, but you can name the function whatever you wish.
+
+Perform fulfillment only once per payment. Because of how this integration and the internet work, your `fulfill_checkout` function might be called multiple times, possibly concurrently, for the same Checkout Session. Performing checkout only once ensures this won’t cause undesired behavior.
+
+Your `fulfill_checkout` function must:
+
+1. Correctly handle being called multiple times with the same Checkout Session ID.
+1. Accept a *Checkout Session* (A Checkout Session represents your customer's session as they pay for one-time purchases or subscriptions through Checkout. After a successful payment, the Checkout Session contains a reference to the Customer, and either the successful PaymentIntent or an active Subscription) ID as an argument.
+1. Retrieve the Checkout Session from the API with the [line_items](https://docs.stripe.com/api/checkout/sessions/object.md#checkout_session_object-line_items) property [expanded](https://docs.stripe.com/api/expanding_objects.md).
+1. Check the [payment_status](https://docs.stripe.com/api/checkout/sessions/object.md#checkout_session_object-payment_status) property to determine if it requires fulfillment.
+1. Perform fulfillment of the line items.
+1. Record fulfillment status for the provided Checkout Session.
+
+Use the code below as a starting point for your `fulfill_checkout` function. The `TODO` comments indicate any functionality you must implement.
+
+> The code snippets below might name the `fulfill_checkout` function `fulfillCheckout` or `FulfillCheckout` depending on the language selected, but they all represent the same function.
+
+#### Node.js
+
+```node
+async function fulfillCheckout(sessionId) {
+  // Don't put any keys in code. See https://docs.stripe.com/keys-best-practices.
+  // Find your keys at https://dashboard.stripe.com/apikeys.
+  const stripe = require('stripe')('<<YOUR_SECRET_KEY>>');
+
+  console.log('Fulfilling Checkout Session ' + sessionId);
+
+  // TODO: Make this function safe to run multiple times,
+  // even concurrently, with the same session ID
+
+  // TODO: Make sure fulfillment hasn't already been
+  // performed for this Checkout Session
+
+  // Retrieve the Checkout Session from the API with line_items expanded
+  const checkoutSession = await stripe.checkout.sessions.retrieve(sessionId, {
+    expand: ['line_items'],
+  });
+
+  // Check the Checkout Session's payment_status property
+  // to determine if fulfillment should be performed
+  if (checkoutSession.payment_status !== 'unpaid') {
+    // TODO: Perform fulfillment of the line items
+
+    // TODO: Record/save fulfillment status for this
+    // Checkout Session
+  }
+}
+```
+
+> If a Checkout Session has many line items, use [auto-pagination](https://docs.stripe.com/api/pagination/auto.md) with the [API for Checkout line items](https://docs.stripe.com/api/checkout/sessions/line_items.md) to retrieve all of them.
+
+Depending on the payment methods you accept and your business needs, you might want to have your `fulfill_checkout` function do the following:
+
+- Provision access to services.
+- Trigger shipment of goods.
+- Save a copy of the payment details and line items in your own database.
+- Send the customer a custom receipt email if you don’t have [Stripe’s receipts](https://docs.stripe.com/receipts.md) enabled.
+- Reconcile line items and quantities purchased if you allow customers to adjust quantities in Checkout.
+- Update inventory or stock records.
+
+## Create a payment event handler [Server-side]
+
+To trigger fulfillment, create a webhook event handler to listen for payment events and trigger your `fulfill_checkout` function.
+
+When someone pays you, it creates a `checkout.session.completed` event. Set up an endpoint on your server to accept, process, and confirm receipt of these events.
+
+### Immediate versus delayed payment methods
+
+Some payment methods aren’t [instant](https://docs.stripe.com/payments/payment-methods.md#payment-notification), such as [ACH direct debit](https://docs.stripe.com/payments/ach-direct-debit.md) and other bank transfers. This means, funds won’t be immediately available when Checkout completes. Delayed payment methods generate a [checkout.session.async_payment_succeeded](https://docs.stripe.com/api/events/types.md#event_types-checkout.session.async_payment_succeeded) event when payment succeeds later. The status of the object is in processing until the payment status either succeeds or fails.
+
+> The webhook secret (`whsec_...`) shown in the code below comes from either the Stripe CLI or your webhook endpoint. You can use the Stripe CLI for local testing, and Stripe uses a webhook endpoint to send events to your handler when it’s running on a server. See the next section for more details.
+
+#### Node.js
+
+```javascript
+// Use the secret provided by Stripe CLI for local testing
+// or your webhook endpoint's secret.
+const endpointSecret = 'whsec_...';
+
+// Using Express
+const app = require('express')();
+
+// Use body-parser to retrieve the raw body as a buffer
+const bodyParser = require('body-parser');
+
+app.post('/webhook', bodyParser.raw({type: 'application/json'}), async (request, response) => {
+  const payload = request.body;
+  const sig = request.headers['stripe-signature'];
+
+  let event;
+
+  try {
+    event = stripe.webhooks.constructEvent(payload, sig, endpointSecret);
+  } catch (err) {
+    return response.status(400).send(`Webhook Error: ${err.message}`);
+  }
+if (
+    event.type === 'checkout.session.completed'
+    || event.type === 'checkout.session.async_payment_succeeded'
+  ) {
+    fulfillCheckout(event.data.object.id);
+  }
+
+  response.status(200).end();
+});
+
+app.listen(4242, () => console.log('Running on port 4242'));
+```
+
+You might also want to listen for and handle `checkout.session.async_payment_failed` events. For example, you can send an email to your customer when a delayed payment fails.
+
+## Test your event handler locally
+
+The quickest way to develop and test your webhook event handler is with the [Stripe CLI](https://docs.stripe.com/stripe-cli.md). If you don’t have the Stripe CLI, follow the [install guide](https://docs.stripe.com/stripe-cli/install.md) to get started.
+
+When the Stripe CLI is installed, you can test your event handler locally. Run your server (for example, on `localhost:4242`), then run the [stripe listen](https://docs.stripe.com/cli/listen) command to have the Stripe CLI forward events to your local server:
+
+```bash
+stripe listen --forward-to localhost:4242/webhook
+
+Ready! Your webhook signing secret is 'whsec_<REDACTED>' (^C to quit)
+```
+
+Add the webhook secret (`whsec_...`) to your event handling code, then test fulfillment by going through Checkout as a customer:
+
+- Press the checkout button that takes you to Checkout, or visit your Payment Link
+- Provide the following test data in Checkout:
+  - Enter `4242 4242 4242 4242` as the card number
+  - Enter any future date for card expiry
+  - Enter any 3-digit number for CVV
+  - Enter any billing postal code (`90210`)
+- Press the **Pay** button
+
+When the payment completes, verify the following:
+
+- On your command line, where `stripe listen` is running, it shows a `checkout.session.completed` event forwarded to your local server.
+- Your server logs show the expected output from your `fulfill_checkout` function.
+
+## Create a webhook endpoint
+
+After testing locally, get your webhook event handler up and running on your server. Next, [create a webhook endpoint](https://docs.stripe.com/webhooks.md#register-webhook) to send `checkout.session.completed` events to your server, then test the Checkout flow again.
+
+## Configure a landing page URL [Recommended]
+
+Configure Checkout to send your customer to a page on your website after they complete Checkout. Include the `{CHECKOUT_SESSION_ID}` placeholder in your page’s URL, which is replaced with the Checkout Session ID when your customer completes the checkout process.
+
+```node
+// Don't put any keys in code. See https://docs.stripe.com/keys-best-practices.
+// Find your keys at https://dashboard.stripe.com/apikeys.
+const stripe = require('stripe')('<<YOUR_SECRET_KEY>>');
+
+const session = await stripe.checkout.sessions.create({
+  line_items: [
+    {
+      price: '{{PRICE_ID}}',
+      quantity: 1,
+    },
+  ],
+  mode: 'payment',
+  ui_mode: 'embedded_page',
+  return_url: 'https://example.com/after-checkout?session_id={CHECKOUT_SESSION_ID}',
+});
+```
+
+## Trigger fulfillment on your landing page [Recommended]
+
+[Listening to webhooks](https://docs.stripe.com/checkout/fulfillment.md#create-payment-event-handler) is required to make sure you always trigger fulfillment for every payment, but webhooks can sometimes be delayed. To optimize your payment flow and guarantee immediate fulfillment when your customer is present, trigger fulfillment from your landing page as well.
+
+Use the Checkout Session ID from the URL you specified in the previous step to do the following:
+
+1. When your server receives a request for your Checkout landing page, extract the Checkout Session ID from the URL.
+1. Run your `fulfill_checkout` function with the ID provided.
+1. Render the page after the fulfillment attempt is complete.
+
+When you render your landing page you can display the following:
+
+- Details from the fulfillment process.
+- Links or information about services the customer now has access to.
+- Shipping or logistical details for physical goods.
+
+> #### Webhooks are required
+> 
+> You can’t rely on triggering fulfillment only from your Checkout landing page, because your customers aren’t guaranteed to visit that page. For example, someone can pay successfully in Checkout and then lose their connection to the internet before your landing page loads.
+> 
+> [Set up a webhook event handler](https://docs.stripe.com/checkout/fulfillment.md#create-payment-event-handler) so Stripe can send payment events directly to your server, bypassing the client entirely. Webhooks provide the most reliable way to confirm when you get paid. If webhook event delivery fails, Stripe [retries multiple times](https://docs.stripe.com/webhooks.md#automatic-retries).

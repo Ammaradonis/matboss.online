@@ -113,7 +113,7 @@ export default function SectionCheckout({ redirectSuccess = false }: SectionChec
     setPaymentError(null);
 
     try {
-      const res = await fetch('/.netlify/functions/create-payment-intent', {
+      const res = await fetch('/.netlify/functions/create-subscription', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

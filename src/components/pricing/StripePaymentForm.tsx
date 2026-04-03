@@ -79,7 +79,7 @@ export default function StripePaymentForm({ onSuccess, formData }: Props) {
             Processing...
           </span>
         ) : (
-          'Deploy Now — $316'
+          'Subscribe & Deploy — $316'
         )}
       </button>
     </form>
