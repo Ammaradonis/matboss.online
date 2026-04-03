@@ -88,6 +88,27 @@ async function forwardToMakeWebhook(
   }
 }
 
+async function ensurePaymentMethodAttached(
+  customerId: string,
+  paymentMethodId: string,
+): Promise<void> {
+  const paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId);
+  const attachedCustomerId = typeof paymentMethod.customer === 'string'
+    ? paymentMethod.customer
+    : paymentMethod.customer?.id;
+
+  if (!attachedCustomerId) {
+    await stripe.paymentMethods.attach(paymentMethodId, { customer: customerId });
+    return;
+  }
+
+  if (attachedCustomerId !== customerId) {
+    throw new Error(
+      `Payment method ${paymentMethodId} belongs to customer ${attachedCustomerId}, expected ${customerId}`,
+    );
+  }
+}
+
 export default async (req: Request, _context: Context) => {
   if (req.method !== 'POST') {
     return new Response(
@@ -119,6 +140,21 @@ export default async (req: Request, _context: Context) => {
   }
 
   switch (event.type) {
+    case 'payment_intent.processing': {
+      const pi = event.data.object as Stripe.PaymentIntent;
+      const meta = pi.metadata;
+
+      if (!meta.school_name) {
+        console.log(`PI ${pi.id} entered processing without metadata, skipping`);
+        break;
+      }
+
+      console.log(
+        `Payment processing: ${pi.id} — ${meta.school_name} (${meta.email}) — waiting on bank settlement`,
+      );
+      break;
+    }
+
     // ── Subscription invoice paid (initial + every recurring charge) ──
     case 'invoice.paid': {
       const invoice = event.data.object as Stripe.Invoice;
@@ -228,28 +264,38 @@ export default async (req: Request, _context: Context) => {
             : pi.payment_method?.id;
 
           if (pmId) {
-            // Set the payment method as the customer's default for invoices
-            await stripe.customers.update(customerId, {
-              invoice_settings: { default_payment_method: pmId },
-            });
-
-            // Create subscription starting ~30 days from now (first month already paid)
-            const trialEnd = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
-            const subscription = await stripe.subscriptions.create({
+            // Guard: skip if customer already has a subscription (webhook retry)
+            const existing = await stripe.subscriptions.list({
               customer: customerId,
-              items: [{ price: meta.price_id }],
-              default_payment_method: pmId,
-              trial_end: trialEnd,
-              metadata: {
-                school_name: meta.school_name || '',
-                owner_name: meta.owner_name || '',
-                email: meta.email || '',
-                phone: meta.phone || '',
-                num_students: meta.num_students || '',
-                current_software: meta.current_software || '',
-              },
+              limit: 1,
             });
-            console.log(`Subscription created: ${subscription.id} for ${meta.school_name} — trial until ${new Date(trialEnd * 1000).toISOString()}`);
+            if (existing.data.length > 0) {
+              console.log(`Customer ${customerId} already has subscription ${existing.data[0].id}, skipping`);
+            } else {
+              // setup_future_usage already saves eligible methods; only attach if Stripe has not done so yet
+              await ensurePaymentMethodAttached(customerId, pmId);
+              await stripe.customers.update(customerId, {
+                invoice_settings: { default_payment_method: pmId },
+              });
+
+              // Create subscription starting ~30 days from now (first month already paid)
+              const trialEnd = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
+              const subscription = await stripe.subscriptions.create({
+                customer: customerId,
+                items: [{ price: meta.price_id }],
+                default_payment_method: pmId,
+                trial_end: trialEnd,
+                metadata: {
+                  school_name: meta.school_name || '',
+                  owner_name: meta.owner_name || '',
+                  email: meta.email || '',
+                  phone: meta.phone || '',
+                  num_students: meta.num_students || '',
+                  current_software: meta.current_software || '',
+                },
+              });
+              console.log(`Subscription created: ${subscription.id} for ${meta.school_name} — bills $197/mo starting ${new Date(trialEnd * 1000).toISOString()}`);
+            }
           }
         } catch (subErr: any) {
           // Log but don't fail the webhook — the payment already succeeded

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useStripe, useElements, PaymentElement } from '@stripe/react-stripe-js';
 
 interface Props {
-  onSuccess: () => void;
+  onPaymentStateChange: (state: 'processing' | 'succeeded') => void;
   formData: {
     school_name: string;
     owner_name: string;
@@ -10,7 +10,7 @@ interface Props {
   };
 }
 
-export default function StripePaymentForm({ onSuccess, formData }: Props) {
+export default function StripePaymentForm({ onPaymentStateChange, formData }: Props) {
   const stripe = useStripe();
   const elements = useElements();
   const [processing, setProcessing] = useState(false);
@@ -24,10 +24,18 @@ export default function StripePaymentForm({ onSuccess, formData }: Props) {
     setProcessing(true);
     setError(null);
 
-    const { error: confirmError } = await stripe.confirmPayment({
+    const { error: submitError } = await elements.submit();
+
+    if (submitError) {
+      setError(submitError.message || 'Please review the payment details and try again.');
+      setProcessing(false);
+      return;
+    }
+
+    const { error: confirmError, paymentIntent } = await stripe.confirmPayment({
       elements,
       confirmParams: {
-        return_url: `${window.location.origin}/pricing?payment_status=success`,
+        return_url: `${window.location.origin}/pricing?payment_return=1`,
         receipt_email: formData.email,
         payment_method_data: {
           billing_details: {
@@ -43,8 +51,21 @@ export default function StripePaymentForm({ onSuccess, formData }: Props) {
       setError(confirmError.message || 'Payment failed. Please try again.');
       setProcessing(false);
     } else {
-      // Payment succeeded without redirect
-      onSuccess();
+      if (paymentIntent?.status === 'succeeded') {
+        onPaymentStateChange('succeeded');
+      } else if (paymentIntent?.status === 'processing') {
+        onPaymentStateChange('processing');
+      } else if (paymentIntent?.status === 'requires_payment_method') {
+        setError('Your payment method was not accepted. Please choose another one and try again.');
+        setProcessing(false);
+        return;
+      } else {
+        setError('Payment setup is incomplete. Please review the payment form and try again.');
+        setProcessing(false);
+        return;
+      }
+
+      setProcessing(false);
     }
   };
 
@@ -79,9 +100,15 @@ export default function StripePaymentForm({ onSuccess, formData }: Props) {
             Processing...
           </span>
         ) : (
-          'Subscribe & Deploy — $316'
+          'Authorize & Pay $316'
         )}
       </button>
+
+      <p className="mt-3 text-[11px] leading-relaxed text-gray-500">
+        By clicking Authorize &amp; Pay $316, you authorize MatBoss to charge $316 today and save this
+        payment method for recurring $197 monthly billing until canceled. ACH bank debits can take up to
+        4 business days to confirm and may require additional bank verification.
+      </p>
     </form>
   );
 }

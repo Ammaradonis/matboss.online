@@ -12,12 +12,16 @@ import Footer from '../components/Footer';
 
 export default function PricingPage() {
   const [searchParams] = useSearchParams();
-  const [redirectSuccess] = useState(
-    () => searchParams.get('payment_status') === 'success',
+  const [returnedFromStripe] = useState(
+    () => Boolean(
+      searchParams.get('payment_return')
+      || searchParams.get('payment_intent_client_secret')
+      || searchParams.get('payment_status') === 'success',
+    ),
   );
 
   useEffect(() => {
-    if (redirectSuccess) {
+    if (returnedFromStripe) {
       // Landed here after Stripe redirect — scroll to checkout section
       setTimeout(() => {
         document.getElementById('checkout')?.scrollIntoView({ behavior: 'smooth' });
@@ -25,7 +29,7 @@ export default function PricingPage() {
     } else {
       window.scrollTo(0, 0);
     }
-  }, [redirectSuccess]);
+  }, [returnedFromStripe]);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -63,7 +67,7 @@ export default function PricingPage() {
       <SectionDetonation />
 
       <div className="section-divider" />
-      <SectionCheckout redirectSuccess={redirectSuccess} />
+      <SectionCheckout />
 
       <div className="section-divider" />
       <Footer />

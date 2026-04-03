@@ -56,6 +56,13 @@ export default async (req: Request, _context: Context) => {
       customer: customer.id,
       automatic_payment_methods: { enabled: true },
       setup_future_usage: 'off_session',
+      payment_method_options: {
+        us_bank_account: {
+          setup_future_usage: 'off_session',
+          transaction_purpose: 'services',
+          verification_method: 'automatic',
+        },
+      },
       metadata: {
         school_name,
         owner_name,

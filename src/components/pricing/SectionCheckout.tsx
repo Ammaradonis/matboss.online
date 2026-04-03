@@ -1,10 +1,11 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
-import type { Appearance } from '@stripe/stripe-js';
+import type { Appearance, PaymentIntent } from '@stripe/stripe-js';
 import StripePaymentForm from './StripePaymentForm';
 
 const stripePromise = loadStripe(import.meta.env.VITE_PUBLISHABLE_KEY);
+const CHECKOUT_STORAGE_KEY = 'matboss-pricing-checkout';
 
 const stripeAppearance: Appearance = {
   theme: 'night',
@@ -64,24 +65,79 @@ interface CheckoutFormData {
   current_software: string;
 }
 
-interface SectionCheckoutProps {
-  redirectSuccess?: boolean;
+type CheckoutCompletionState = 'processing' | 'succeeded' | null;
+
+const EMPTY_FORM_DATA: CheckoutFormData = {
+  school_name: '',
+  owner_name: '',
+  email: '',
+  phone: '',
+  num_students: '',
+  current_software: '',
+};
+
+function getReturnClientSecret(): string | null {
+  if (typeof window === 'undefined') return null;
+  return new URLSearchParams(window.location.search).get('payment_intent_client_secret');
 }
 
-export default function SectionCheckout({ redirectSuccess = false }: SectionCheckoutProps) {
-  const [formData, setFormData] = useState<CheckoutFormData>({
-    school_name: '',
-    owner_name: '',
-    email: '',
-    phone: '',
-    num_students: '',
-    current_software: '',
-  });
+function readStoredFormData(): CheckoutFormData {
+  if (typeof window === 'undefined') return EMPTY_FORM_DATA;
+
+  try {
+    const raw = window.sessionStorage.getItem(CHECKOUT_STORAGE_KEY);
+    if (!raw) return EMPTY_FORM_DATA;
+
+    const parsed = JSON.parse(raw) as Partial<CheckoutFormData>;
+    return {
+      school_name: parsed.school_name ?? '',
+      owner_name: parsed.owner_name ?? '',
+      email: parsed.email ?? '',
+      phone: parsed.phone ?? '',
+      num_students: parsed.num_students ?? '',
+      current_software: parsed.current_software ?? '',
+    };
+  } catch {
+    return EMPTY_FORM_DATA;
+  }
+}
+
+function describeReturnedIntentStatus(status: PaymentIntent.Status): {
+  completionState: CheckoutCompletionState;
+  error: string | null;
+} {
+  switch (status) {
+    case 'succeeded':
+      return { completionState: 'succeeded', error: null };
+    case 'processing':
+      return { completionState: 'processing', error: null };
+    case 'requires_payment_method':
+      return {
+        completionState: null,
+        error: 'Your payment method was not accepted. Please choose another card or bank account and try again.',
+      };
+    case 'requires_action':
+      return {
+        completionState: null,
+        error: 'Stripe still needs an additional verification step. Please reopen the payment form and continue.',
+      };
+    default:
+      return {
+        completionState: null,
+        error: `Payment status is currently ${status.replace(/_/g, ' ')}. Please complete the remaining steps in the payment form.`,
+      };
+  }
+}
+
+export default function SectionCheckout() {
+  const returnClientSecret = getReturnClientSecret();
+  const [formData, setFormData] = useState<CheckoutFormData>(() => readStoredFormData());
   const [errors, setErrors] = useState<Partial<CheckoutFormData>>({});
-  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [clientSecret, setClientSecret] = useState<string | null>(returnClientSecret);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
-  const [paymentSuccess, setPaymentSuccess] = useState(redirectSuccess);
+  const [paymentState, setPaymentState] = useState<CheckoutCompletionState>(null);
+  const [checkingPaymentStatus, setCheckingPaymentStatus] = useState(Boolean(returnClientSecret));
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -105,12 +161,58 @@ export default function SectionCheckout({ redirectSuccess = false }: SectionChec
     return Object.keys(newErrors).length === 0;
   };
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.sessionStorage.setItem(CHECKOUT_STORAGE_KEY, JSON.stringify(formData));
+  }, [formData]);
+
+  useEffect(() => {
+    if (!returnClientSecret) return;
+
+    let ignore = false;
+    setClientSecret(returnClientSecret);
+    setCheckingPaymentStatus(true);
+    setPaymentError(null);
+
+    void (async () => {
+      const stripe = await stripePromise;
+
+      if (!stripe) {
+        if (!ignore) {
+          setPaymentError('Stripe could not be loaded to verify the payment status. Please refresh and try again.');
+          setCheckingPaymentStatus(false);
+        }
+        return;
+      }
+
+      const { paymentIntent, error } = await stripe.retrievePaymentIntent(returnClientSecret);
+
+      if (ignore) return;
+
+      if (error || !paymentIntent) {
+        setPaymentError(error?.message || 'We could not retrieve your payment status. Please refresh and try again.');
+        setCheckingPaymentStatus(false);
+        return;
+      }
+
+      const statusResult = describeReturnedIntentStatus(paymentIntent.status);
+      setPaymentState(statusResult.completionState);
+      setPaymentError(statusResult.error);
+      setCheckingPaymentStatus(false);
+    })();
+
+    return () => {
+      ignore = true;
+    };
+  }, [returnClientSecret]);
+
   const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
 
     setPaymentLoading(true);
     setPaymentError(null);
+    setPaymentState(null);
 
     try {
       const res = await fetch('/.netlify/functions/create-subscription', {
@@ -140,8 +242,9 @@ export default function SectionCheckout({ redirectSuccess = false }: SectionChec
     }
   };
 
-  const handlePaymentSuccess = useCallback(() => {
-    setPaymentSuccess(true);
+  const handlePaymentStateChange = useCallback((nextState: Exclude<CheckoutCompletionState, null>) => {
+    setPaymentState(nextState);
+    setPaymentError(null);
   }, []);
 
   const inputClass = (field: keyof CheckoutFormData) =>
@@ -149,8 +252,19 @@ export default function SectionCheckout({ redirectSuccess = false }: SectionChec
      placeholder-gray-600 focus:outline-none focus:border-dojo-red transition-colors
      ${errors[field] ? 'border-dojo-red/60' : 'border-white/10'}`;
 
-  // ── Success State ──
-  if (paymentSuccess) {
+  const ownerName = formData.owner_name.trim();
+  const schoolName = formData.school_name.trim();
+  const customerEmail = formData.email.trim();
+
+  // ── Payment Status State ──
+  if (checkingPaymentStatus || paymentState) {
+    const isProcessing = checkingPaymentStatus || paymentState === 'processing';
+    const title = checkingPaymentStatus
+      ? 'Checking Payment Status'
+      : isProcessing
+        ? 'ACH Authorization Received'
+        : 'Payment Confirmed';
+
     return (
       <section id="checkout" className="py-20 md:py-28 px-4 relative overflow-hidden">
         <div className="absolute inset-0 pointer-events-none">
@@ -158,25 +272,71 @@ export default function SectionCheckout({ redirectSuccess = false }: SectionChec
         </div>
         <div className="max-w-lg mx-auto reveal">
           <div className="bg-dojo-dark/80 border border-white/5 rounded-2xl p-8 text-center">
-            <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-green-500/10 border-2 border-green-500/40 flex items-center justify-center">
-              <svg className="w-8 h-8 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
+            <div
+              className={`w-16 h-16 mx-auto mb-6 rounded-full border-2 flex items-center justify-center ${
+                isProcessing
+                  ? 'bg-dojo-gold/10 border-dojo-gold/40'
+                  : 'bg-green-500/10 border-green-500/40'
+              }`}
+            >
+              {isProcessing ? (
+                <svg className="w-8 h-8 text-dojo-gold animate-spin" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+              ) : (
+                <svg className="w-8 h-8 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              )}
             </div>
             <h2 className="font-heading text-3xl md:text-4xl text-white tracking-wide mb-3">
-              Payment Confirmed
+              {title}
             </h2>
             <p className="text-gray-400 text-base leading-relaxed mb-2">
-              Welcome to MatBoss, <span className="text-white font-semibold">{formData.owner_name}</span>.
+              {checkingPaymentStatus
+                ? 'We are pulling the latest status from Stripe.'
+                : isProcessing
+                  ? ownerName
+                    ? `We received ${ownerName}'s payment authorization.`
+                    : 'We received your payment authorization.'
+                  : ownerName
+                    ? `Welcome to MatBoss, ${ownerName}.`
+                    : 'Your first payment cleared successfully.'}
             </p>
             <p className="text-gray-500 text-sm leading-relaxed mb-6">
-              We'll begin system mapping for <span className="text-white">{formData.school_name}</span> within
-              24 hours. Check <span className="text-white">{formData.email}</span> for your receipt and
-              onboarding details.
+              {checkingPaymentStatus ? (
+                'This only takes a moment.'
+              ) : isProcessing ? (
+                <>
+                  Stripe can take up to 4 business days to confirm an ACH debit.
+                  {schoolName ? ` We will start mapping ${schoolName} as soon as the first payment clears.` : ' We will start mapping your academy as soon as the first payment clears.'}
+                  {' '}
+                  Your monthly $197 subscription is created automatically after that first payment succeeds.
+                  {customerEmail ? ` Check ${customerEmail} for mandate or verification emails.` : ''}
+                </>
+              ) : (
+                <>
+                  {schoolName
+                    ? `We'll begin system mapping for ${schoolName} within 24 hours.`
+                    : 'We will begin system mapping within 24 hours.'}
+                  {customerEmail ? ` Check ${customerEmail} for your receipt and onboarding details.` : ''}
+                </>
+              )}
             </p>
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-dojo-carbon border border-white/5 text-xs text-gray-400">
-              <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-              Deployment pipeline activated
+            <div
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border text-xs ${
+                isProcessing
+                  ? 'bg-dojo-gold/10 border-dojo-gold/30 text-dojo-gold'
+                  : 'bg-dojo-carbon border-white/5 text-gray-400'
+              }`}
+            >
+              <div
+                className={`w-2 h-2 rounded-full ${
+                  isProcessing ? 'bg-dojo-gold animate-pulse' : 'bg-green-400 animate-pulse'
+                }`}
+              />
+              {isProcessing ? 'Waiting for bank settlement' : 'Deployment pipeline activated'}
             </div>
           </div>
         </div>
@@ -350,8 +510,8 @@ export default function SectionCheckout({ redirectSuccess = false }: SectionChec
                 </div>
               </div>
 
-              {/* Error from payment intent creation */}
-              {paymentError && !clientSecret && (
+              {/* Error from payment intent creation or return status lookup */}
+              {paymentError && (
                 <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
                   {paymentError}
                 </div>
@@ -385,6 +545,17 @@ export default function SectionCheckout({ redirectSuccess = false }: SectionChec
             {clientSecret && (
               <div className="px-6 pb-6">
                 <div className="border-t border-white/5 pt-6">
+                  <div className="mb-4 p-4 rounded-xl bg-dojo-carbon/50 border border-white/5">
+                    <p className="text-xs font-mono text-dojo-gold uppercase tracking-widest mb-2">
+                      Card Or ACH
+                    </p>
+                    <p className="text-sm text-gray-400 leading-relaxed">
+                      Pay with a card or a US bank account. ACH bank debits can stay in processing for up to
+                      4 business days, and Stripe might request microdeposit verification before the first
+                      $316 payment clears.
+                    </p>
+                  </div>
+
                   <div className="flex items-center gap-2 mb-4">
                     <svg className="w-4 h-4 text-dojo-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path
@@ -407,7 +578,7 @@ export default function SectionCheckout({ redirectSuccess = false }: SectionChec
                     }}
                   >
                     <StripePaymentForm
-                      onSuccess={handlePaymentSuccess}
+                      onPaymentStateChange={handlePaymentStateChange}
                       formData={formData}
                     />
                   </Elements>
@@ -427,7 +598,8 @@ export default function SectionCheckout({ redirectSuccess = false }: SectionChec
                       <span className="text-dojo-red font-heading text-lg">$316</span>
                     </div>
                     <p className="text-[10px] text-gray-600 mt-2">
-                      Then $197/month. No contracts. Cancel anytime.
+                      Then $197/month to the saved payment method until canceled. ACH can take up to 4
+                      business days to clear.
                     </p>
                   </div>
                 </div>
