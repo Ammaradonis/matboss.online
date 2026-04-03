@@ -73,7 +73,6 @@ export default async (req: Request, _context: Context) => {
       items: [{ price: priceId }],
       payment_behavior: 'default_incomplete',
       payment_settings: {
-        payment_method_types: ['card', 'link', 'us_bank_account', 'paypal'],
         save_default_payment_method: 'on_subscription',
       },
       metadata: {
