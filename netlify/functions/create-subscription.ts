@@ -86,46 +86,45 @@ export default async (req: Request, _context: Context) => {
         num_students: String(num_students),
         current_software,
       },
-      expand: ['latest_invoice.payment_intent'],
     });
     console.log('Step 3 OK — subscription:', subscription.id, 'status:', subscription.status);
 
-    const invoice = subscription.latest_invoice;
-    console.log('Step 3a — latest_invoice type:', typeof invoice, 'value:', typeof invoice === 'string' ? invoice : (invoice as any)?.id);
+    // 4. Retrieve the invoice separately (avoids nested-expand issues)
+    const invoiceId = typeof subscription.latest_invoice === 'string'
+      ? subscription.latest_invoice
+      : subscription.latest_invoice?.id;
 
-    if (!invoice || typeof invoice === 'string') {
-      const msg = `Subscription ${subscription.id} has no expanded invoice (got ${typeof invoice})`;
-      console.error(msg);
-      return new Response(
-        JSON.stringify({ error: msg }),
-        { status: 500, headers },
-      );
+    if (!invoiceId) {
+      throw new Error(`Subscription ${subscription.id} created with no invoice`);
+    }
+    console.log('Step 4 OK — invoice ID:', invoiceId);
+
+    // 5. If invoice is still draft, finalize it so Stripe creates the PaymentIntent
+    let invoice = await stripe.invoices.retrieve(invoiceId);
+    console.log('Step 5 — invoice status:', invoice.status, 'amount_due:', invoice.amount_due, 'payment_intent:', invoice.payment_intent);
+
+    if (invoice.status === 'draft') {
+      console.log('Step 5a — invoice is draft, finalizing...');
+      invoice = await stripe.invoices.finalizeInvoice(invoiceId);
+      console.log('Step 5a OK — finalized, status:', invoice.status, 'payment_intent:', invoice.payment_intent);
     }
 
-    const pi = (invoice as Stripe.Invoice).payment_intent;
-    console.log('Step 3b — payment_intent type:', typeof pi, 'value:', typeof pi === 'string' ? pi : (pi as any)?.id, 'client_secret exists:', !!(pi as any)?.client_secret);
+    // 6. Get the PaymentIntent from the finalized invoice
+    const piId = typeof invoice.payment_intent === 'string'
+      ? invoice.payment_intent
+      : invoice.payment_intent?.id;
 
-    if (!pi || typeof pi === 'string') {
-      const msg = `Invoice ${(invoice as Stripe.Invoice).id} has no expanded payment_intent (got ${typeof pi}: ${pi})`;
-      console.error(msg);
-      return new Response(
-        JSON.stringify({ error: msg }),
-        { status: 500, headers },
-      );
+    if (!piId) {
+      throw new Error(`Invoice ${invoiceId} (status=${invoice.status}, amount=${invoice.amount_due}) has no PaymentIntent`);
     }
 
-    const paymentIntent = pi as Stripe.PaymentIntent;
+    const paymentIntent = await stripe.paymentIntents.retrieve(piId);
+    console.log('Step 6 OK — PI:', paymentIntent.id, 'status:', paymentIntent.status);
 
     if (!paymentIntent.client_secret) {
-      const msg = `PaymentIntent ${paymentIntent.id} has no client_secret (status: ${paymentIntent.status})`;
-      console.error(msg);
-      return new Response(
-        JSON.stringify({ error: msg }),
-        { status: 500, headers },
-      );
+      throw new Error(`PaymentIntent ${paymentIntent.id} (status=${paymentIntent.status}) has no client_secret`);
     }
 
-    console.log('Step 4 OK — returning client_secret for PI:', paymentIntent.id);
     return new Response(
       JSON.stringify({
         clientSecret: paymentIntent.client_secret,
