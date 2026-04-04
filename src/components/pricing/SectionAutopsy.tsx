@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { AutopsyChart, AutopsyDiagram, AutopsyInteractive } from '../visuals/AutopsyVisuals';
 
 export default function SectionAutopsy() {
   const [totalCount, setTotalCount] = useState(0);
@@ -99,6 +100,9 @@ export default function SectionAutopsy() {
             </div>
           </div>
         </div>
+        <AutopsyChart />
+        <AutopsyDiagram />
+        <AutopsyInteractive />
       </div>
     </section>
   );

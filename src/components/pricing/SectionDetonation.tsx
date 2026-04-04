@@ -1,3 +1,5 @@
+import { DetonationChart, DetonationDiagram, DetonationInteractive } from '../visuals/DetonationVisuals';
+
 export default function SectionDetonation() {
   const timeline = [
     {
@@ -127,6 +129,9 @@ export default function SectionDetonation() {
             </div>
           </div>
         </div>
+        <DetonationChart />
+        <DetonationDiagram />
+        <DetonationInteractive />
       </div>
     </section>
   );

@@ -1,3 +1,5 @@
+import { DirtySecretChart, DirtySecretDiagram, DirtySecretInteractive } from '../visuals/DirtySecretVisuals';
+
 export default function SectionDirtySecret() {
   const competitors = [
     {
@@ -115,6 +117,9 @@ export default function SectionDirtySecret() {
             </p>
           </div>
         </div>
+        <DirtySecretChart />
+        <DirtySecretDiagram />
+        <DirtySecretInteractive />
       </div>
     </section>
   );

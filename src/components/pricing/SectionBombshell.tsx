@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { BombshellChart, BombshellDiagram, BombshellInteractive } from '../visuals/BombshellVisuals';
 
 export default function SectionBombshell() {
   const [revealed, setRevealed] = useState(false);
@@ -147,6 +148,9 @@ export default function SectionBombshell() {
             <span className="text-dojo-gold"> Every student after that is pure upside.</span>
           </p>
         </div>
+        <BombshellChart />
+        <BombshellDiagram />
+        <BombshellInteractive />
       </div>
     </section>
   );

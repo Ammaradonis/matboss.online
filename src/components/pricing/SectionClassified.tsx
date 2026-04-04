@@ -1,3 +1,5 @@
+import { ClassifiedChart, ClassifiedDiagram, ClassifiedInteractive } from '../visuals/ClassifiedVisuals';
+
 export default function SectionClassified() {
   return (
     <section className="relative min-h-[80vh] overflow-hidden gi-texture flex items-center">
@@ -82,6 +84,9 @@ export default function SectionClassified() {
             </svg>
           </div>
         </div>
+        <ClassifiedChart />
+        <ClassifiedDiagram />
+        <ClassifiedInteractive />
       </div>
     </section>
   );
