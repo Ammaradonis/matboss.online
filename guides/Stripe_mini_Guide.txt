@@ -163,3 +163,26 @@ processing_error
 stolen_card
 test_mode_live_card
 To display messages for other types of errors, refer to error codes and error handling.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+since the mantra (one-time payment + monthly recurring subscription) cannot be fulfilled with "C:\Users\FingerWeg\CascadeProjects\matboss.online\guides\bank-transfer.txt",
+ we decided to clone the current /pricing page and create a new /bank-transfer page that ONLY uses
+"C:\Users\FingerWeg\CascadeProjects\matboss.online\guides\bank-transfer.txt" for checkout. INTERNALIZE the current integration within the /pricing page and how
+"C:\Users\FingerWeg\CascadeProjects\matboss.online\guides\bank-transfer.txt" is integrated with the checkout form so you can replicate that in the new /bank-transfer page.
+the new /bank-transfer page must use the same copy and design as the /pricing page BUT the checkout form must ONLY render the bank transfer payment method upon clicking
+'check out'. Notice, you must remove any bank transfer mention or integration withinn the /pricing page and keep the ACH bank debit option as it allows us to charge monthly
+subscription fees.
