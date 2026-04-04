@@ -1,3 +1,5 @@
+import { AdminChart, AdminDiagram, AdminInteractive } from './visuals/AdminOverloadVisuals';
+
 export default function SectionAdminOverload() {
   const tasks = [
     { label: 'Check voicemail for new inquiries', time: '15 min', wasted: true },
@@ -98,6 +100,9 @@ export default function SectionAdminOverload() {
             </div>
           </div>
         </div>
+        <AdminChart />
+        <AdminDiagram />
+        <AdminInteractive />
       </div>
     </section>
   );

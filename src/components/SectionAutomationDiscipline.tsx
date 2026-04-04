@@ -1,3 +1,5 @@
+import { AutomationChart, AutomationDiagram, AutomationInteractive } from './visuals/AutomationVisuals';
+
 export default function SectionAutomationDiscipline() {
   const steps = [
     {
@@ -105,6 +107,9 @@ export default function SectionAutomationDiscipline() {
             </span>
           </div>
         </div>
+        <AutomationChart />
+        <AutomationDiagram />
+        <AutomationInteractive />
       </div>
     </section>
   );

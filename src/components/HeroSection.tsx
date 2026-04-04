@@ -1,6 +1,7 @@
 import TypewriterHeadline from './TypewriterHeadline';
 import BookingCalendar from './BookingCalendar';
 import DojoBackground from './DojoBackground';
+import { HeroChart, HeroDiagram, HeroInteractive } from './visuals/HeroVisuals';
 
 export default function HeroSection() {
   return (
@@ -92,6 +93,9 @@ export default function HeroSection() {
             <div className="text-[10px] text-gray-500 uppercase tracking-wider">Extra Ad Spend Required</div>
           </div>
         </div>
+        <HeroChart />
+        <HeroDiagram />
+        <HeroInteractive />
       </div>
     </section>
   );

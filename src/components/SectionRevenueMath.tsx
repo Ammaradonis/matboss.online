@@ -1,3 +1,5 @@
+import { RevenueChart, RevenueDiagram, RevenueInteractive } from './visuals/RevenueMathVisuals';
+
 export default function SectionRevenueMath() {
   const rows = [
     { metric: 'Average Monthly Membership', value: '$150', highlight: false },
@@ -76,6 +78,9 @@ export default function SectionRevenueMath() {
             </div>
           </div>
         </div>
+        <RevenueChart />
+        <RevenueDiagram />
+        <RevenueInteractive />
       </div>
     </section>
   );

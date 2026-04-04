@@ -264,6 +264,17 @@
   text-shadow: 0 0 30px rgba(220,38,38,0.3);
 }
 
+/* === VISUAL ANIMATIONS === */
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@keyframes pipeFlow {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(8px); }
+}
+
 /* === SECTION DIVIDER === */
 .section-divider {
   @apply w-full h-px;

@@ -1,3 +1,5 @@
+import { CityChart, CityDiagram, CityInteractive } from './visuals/CityAuthorityVisuals';
+
 export default function SectionCityAuthority() {
   const insights = [
     {
@@ -107,6 +109,9 @@ export default function SectionCityAuthority() {
             </div>
           </div>
         </div>
+        <CityChart />
+        <CityDiagram />
+        <CityInteractive />
       </div>
     </section>
   );

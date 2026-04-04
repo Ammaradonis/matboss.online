@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { NoShowChart, NoShowDiagram, NoShowInteractive } from './visuals/NoShowVisuals';
 
 export default function SectionNoShow() {
   const [count, setCount] = useState(0);
@@ -110,6 +111,9 @@ export default function SectionNoShow() {
             </div>
           </div>
         </div>
+        <NoShowChart />
+        <NoShowDiagram />
+        <NoShowInteractive />
       </div>
     </section>
   );
