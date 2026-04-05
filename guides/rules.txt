@@ -1,0 +1,76 @@
+# Payment method rules
+
+Control when payment methods are available to your buyers.
+
+Payment method rules allow you to set conditions on payment methods directly from the Dashboard without any custom logic or code. Rules allow you to:
+
+- Hide or show a payment method if the order amount is over or under a certain amount
+- Hide or show a payment method for buyers in certain countries or using certain currencies
+
+## Payment method rules considerations
+
+Non-card payment methods can help offer improved unit economics compared to cards and they often drive higher AOV and conversion rates.
+
+When you turn on these payment methods, you might want to apply specific business logic to control when payment methods are available to your buyers. With payment method rules, you can apply these insights directly in Dashboard—no code required.
+
+Payment method rules are compatible with Stripe [A/B Testing](https://docs.stripe.com/payments/a-b-testing.md). This allows you to run A/B tests using the targeting criteria you select or test additional criteria. For example, you can test the impact of only showing a specific payment method when the price is greater than a certain dollar amount.
+
+> Payment method rules won’t apply when a Payment Element, Express Checkout Element, Checkout, or Payment Links integration creates a *subscription* (A Subscription represents the product details associated with the plan that your customer subscribes to. Allows you to charge the customer on a recurring basis). For more information about subscriptions and invoices, see [How subscriptions work](https://docs.stripe.com/billing/subscriptions/overview.md).
+
+## Before you begin
+
+- You must use either the Stripe [Payment Element](https://docs.stripe.com/payments/payment-element.md), [Express Checkout Element](https://docs.stripe.com/elements/express-checkout-element.md), [Checkout](https://docs.stripe.com/payments/checkout.md), or [Payment Links](https://docs.stripe.com/payment-links.md).
+- You must use [Dynamic payment methods](https://docs.stripe.com/payments/payment-methods/dynamic-payment-methods.md) to enable additional payment methods from the Stripe Dashboard, which won’t require any code changes.
+  - To set up dynamic payment methods for direct users, see the [payment method integration](https://docs.stripe.com/payments/payment-methods/dynamic-payment-methods.md) guide.
+  - (Connect) To set up dynamic payment methods for Connect platforms, see [Upgrading to dynamic payment methods](https://docs.stripe.com/connect/dynamic-payment-methods.md).
+
+## Set rule conditions
+
+1. In your Dashboard, go to [Payment methods settings](https://dashboard.stripe.com/test/settings/payment_methods).
+1. For a supported payment method (such as Klarna), click the overflow menu (⋯) and select **Customize availability**.
+1. Set custom rules (for example, a new minimum of 100 USD for Klarna), then select **Apply Overrides**. The configured payment method now has a **Customized** tag. A customized payment method appears only in Checkout, Payment Element, or Express Checkout Element sessions that meet its targeting criteria.
+
+> In your Dashboard, you configure transaction limits in a single currency. When evaluating these limits in a transaction that uses a different currency, Stripe automatically calculates the equivalent limits using the current exchange rate.
+![A checkout page showing Klarna.](https://b.stripecdn.com/docs-statics-srv/assets/pmt-checkout-klarna-present.fab9fed6ec4dfc1e187b38beb944fc65.png)
+
+Before
+![A checkout page with Klarna hidden.](https://b.stripecdn.com/docs-statics-srv/assets/pmt-checkout-klarna-hidden.e1d585ab6318861be8aa813cdde91fb4.png)
+
+After
+
+## Testing
+
+To test location-based payment method rules for Checkout and Payment Links, pass in a location-formatted customer email that includes a suffix in a `+location_XX` format in the local part of the email. `XX` must be a valid [two-letter ISO country code](https://www.nationsonline.org/oneworld/country_code_list.htm).
+
+For example, to test location-based rules for a customer in France, pass in an email like `test+location_FR@example.com`.
+
+When you visit the URL for a Checkout Session or Payment Link created with a location-formatted email, you see the same available payment methods as a customer does in the specified country.
+
+### Testing Checkout
+
+When you create a Checkout Session, pass the location-formatted email as [customer_email](https://docs.stripe.com/api/checkout/sessions/object.md#checkout_session_object-customer_email) to simulate Checkout from a particular country.
+
+```node
+// Don't put any keys in code. See https://docs.stripe.com/keys-best-practices.
+// Find your keys at https://dashboard.stripe.com/apikeys.
+const stripe = require('stripe')('<<YOUR_SECRET_KEY>>');
+
+const session = await stripe.checkout.sessions.create({
+  line_items: [
+    {
+      price: '{{PRICE_ID}}',
+      quantity: 1,
+    },
+  ],
+  mode: 'payment',
+  success_url: 'https://example.com/success',
+  customer_email: 'test+location_FR@example.com',
+});
+```
+
+You can also create a [Customer](https://docs.stripe.com/api/customers/create.md) and specify their email that contains the `+location_XX` suffix. Stripe [test cards](https://docs.stripe.com/testing.md#cards) work as usual.
+
+### Testing Payment Links
+
+For Payment Links, pass the location-formatted email as either the `prefilled_email` or `locked_prefilled_email` [URL parameter](https://docs.stripe.com/payment-links/customize.md#customize-checkout-with-url-parameters) to test payment method rules for customers in different countries.
+

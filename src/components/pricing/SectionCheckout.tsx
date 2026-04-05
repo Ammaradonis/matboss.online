@@ -542,8 +542,8 @@ export default function SectionCheckout() {
                   </button>
 
                   <p className="text-[11px] text-gray-500 leading-relaxed">
-                    Apple Pay, Venmo, card, and ACH bank debit save a payment method for automatic $197 monthly billing.
-                    ACH bank debits can take up to 4 business days to clear.
+                    All payment methods save for automatic $197 monthly billing. ACH bank debits can
+                    take up to 4 business days to clear.
                   </p>
                 </div>
               )}
@@ -555,12 +555,13 @@ export default function SectionCheckout() {
                 <div className="border-t border-white/5 pt-6">
                   <div className="mb-4 p-4 rounded-xl bg-dojo-carbon/50 border border-white/5">
                     <p className="text-xs font-mono text-dojo-gold uppercase tracking-widest mb-2">
-                      Apple Pay, Venmo, Card, Or ACH
+                      Choose Your Payment Method
                     </p>
                     <p className="text-sm text-gray-400 leading-relaxed">
-                      Pay instantly with Apple Pay, Google Pay, or Venmo, or use a card or US bank
-                      account. ACH bank debits can stay in processing for up to 4 business days, and
-                      Stripe might request microdeposit verification before the first $316 payment clears.
+                      Pay instantly with Apple Pay, Google Pay, Venmo, Cash App Pay, or Klarna, or
+                      use a card or US bank account. ACH bank debits can stay in processing for up to
+                      4 business days, and Stripe might request microdeposit verification before the
+                      first $316 payment clears.
                     </p>
                   </div>
 

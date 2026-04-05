@@ -171,7 +171,13 @@ export default function StripePaymentForm({ onPaymentStateChange, formData }: Pr
 
       <PaymentElement
         options={{
-          layout: 'tabs',
+          layout: {
+            type: 'accordion',
+            defaultCollapsed: false,
+            radios: 'never',
+            spacedAccordionItems: true,
+            visibleAccordionItemsCount: 10,
+          },
           business: { name: 'MatBoss' },
         }}
       />
