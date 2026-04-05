@@ -46,14 +46,14 @@ export default function SectionCityAuthority() {
         </div>
 
         {/* Insight Cards */}
-        <div className="grid md:grid-cols-3 gap-6 mb-12">
+        <div className="grid gap-4 md:grid-cols-3 md:gap-6 mb-12">
           {insights.map((insight, i) => (
             <div
               key={i}
               className="p-6 rounded-xl bg-dojo-dark/60 border border-white/5
                          hover:border-dojo-red/20 transition-all duration-300 group"
             >
-              <div className="text-4xl md:text-5xl font-heading text-dojo-red mb-1
+                <div className="text-4xl md:text-5xl font-heading text-dojo-red mb-1
                               group-hover:text-dojo-gold transition-colors duration-300">
                 {insight.stat}
               </div>
@@ -97,9 +97,7 @@ export default function SectionCityAuthority() {
 
               <a
                 href="#booking"
-                className="mt-6 px-6 py-3 rounded-lg bg-dojo-red text-white font-heading text-sm tracking-wider
-                           hover:bg-dojo-crimson transition-all duration-200 red-glow-hover
-                           inline-flex items-center gap-2"
+                className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-dojo-red px-6 py-3 text-sm font-heading tracking-wider text-white transition-all duration-200 hover:bg-dojo-crimson red-glow-hover sm:w-auto"
               >
                 <span>Book Your Diagnosis Call</span>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

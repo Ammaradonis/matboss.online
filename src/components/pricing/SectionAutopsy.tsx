@@ -73,7 +73,7 @@ export default function SectionAutopsy() {
 
             <div className="divide-y divide-white/5">
               {findings.map((item, i) => (
-                <div key={i} className="flex items-center justify-between px-5 py-4">
+                <div key={i} className="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex-1">
                     <span className="text-sm text-gray-400">{item.label}</span>
                     <span className="ml-2 text-xs font-mono text-dojo-gold">x{item.count}</span>

@@ -76,7 +76,7 @@ export default function SectionDirtySecret() {
                     item.highlight ? 'bg-dojo-red/8 border-l-2 border-l-dojo-red' : ''
                   }`}
                 >
-                  <div className="flex items-center justify-between mb-1">
+                  <div className="mb-1 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                     <span
                       className={`text-sm font-semibold ${
                         item.highlight ? 'text-white' : 'text-gray-400'

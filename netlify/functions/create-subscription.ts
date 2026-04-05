@@ -47,16 +47,15 @@ export default async (req: Request, _context: Context) => {
       metadata: { school_name, num_students: String(num_students), current_software },
     });
 
-    // 2. Create a PaymentIntent with the proven automatic_payment_methods flow.
-    //    setup_future_usage is set per-method (not top-level) so Stripe does not
-    //    filter out payment methods whose saving support it cannot verify upfront
-    //    (e.g. Venmo custom type, Klarna). Each method that supports saving gets
-    //    setup_future_usage individually; the rest still appear for first payment.
+    // 2. Create a PaymentIntent with explicit payment_method_types so we control
+    //    exactly which methods appear. This excludes customer_balance (bank transfer)
+    //    while keeping card, ACH, Cash App Pay, PayPal, Klarna, and Stripe Link.
+    //    setup_future_usage is set per-method in payment_method_options below.
     const paymentIntent = await stripe.paymentIntents.create({
       amount: TOTAL,
       currency: 'usd',
       customer: customer.id,
-      automatic_payment_methods: { enabled: true },
+      payment_method_types: ['card', 'us_bank_account', 'cashapp', 'paypal', 'klarna', 'link'],
       payment_method_options: {
         card: {
           setup_future_usage: 'off_session',

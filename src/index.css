@@ -8,13 +8,20 @@
     scroll-behavior: smooth;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    scroll-padding-top: 7rem;
   }
 
   body {
     @apply bg-dojo-black text-white font-body;
+    overflow-x: hidden;
     background-image:
       radial-gradient(ellipse at 20% 50%, rgba(220,38,38,0.03) 0%, transparent 50%),
       radial-gradient(ellipse at 80% 20%, rgba(212,160,23,0.02) 0%, transparent 50%);
+  }
+
+  button,
+  [role='button'] {
+    touch-action: manipulation;
   }
 
   ::selection {
@@ -203,8 +210,8 @@
 
 /* === CALENDAR SPECIFIC === */
 .calendar-day {
-  @apply relative flex items-center justify-center w-10 h-10 rounded-full
-         text-sm font-medium transition-all duration-200 cursor-pointer;
+  @apply relative flex items-center justify-center w-full min-h-10 aspect-square rounded-xl
+         text-xs sm:text-sm font-medium transition-all duration-200 cursor-pointer;
 }
 
 .calendar-day.available {
@@ -235,7 +242,7 @@
 
 /* === TIME SLOT PILLS === */
 .time-slot {
-  @apply px-4 py-2 rounded-lg text-sm font-mono font-medium
+  @apply px-4 py-3 rounded-xl text-sm font-mono font-medium
          border border-dojo-red/30 text-white
          transition-all duration-200 cursor-pointer;
   background: linear-gradient(135deg, rgba(220,38,38,0.08), rgba(220,38,38,0.02));
@@ -253,7 +260,7 @@
 
 /* === MODAL OVERLAY === */
 .modal-overlay {
-  @apply fixed inset-0 z-50 flex items-center justify-center;
+  @apply fixed inset-0 z-50 flex items-end justify-center p-3 sm:items-center sm:p-4;
   background: rgba(0,0,0,0.85);
   backdrop-filter: blur(8px);
 }
@@ -279,4 +286,39 @@
 .section-divider {
   @apply w-full h-px;
   background: linear-gradient(90deg, transparent, rgba(220,38,38,0.3), rgba(212,160,23,0.2), rgba(220,38,38,0.3), transparent);
+}
+
+@media (max-width: 640px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+
+  .fomo-ticker-content {
+    animation-duration: 28s;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .announcement-bar,
+  .belt-stripe,
+  .fomo-ticker-content,
+  .particle-red,
+  .particle-gold,
+  .reveal,
+  .strike-line,
+  .typewriter-cursor {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .reveal {
+    opacity: 1;
+    transform: none;
+  }
 }

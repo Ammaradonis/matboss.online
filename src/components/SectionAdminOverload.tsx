@@ -30,7 +30,7 @@ export default function SectionAdminOverload() {
                 {tasks.map((task, i) => (
                   <div
                     key={i}
-                    className={`flex items-center justify-between p-3 rounded-lg transition-all duration-500 ${
+                    className={`flex flex-col gap-2 p-3 rounded-lg transition-all duration-500 sm:flex-row sm:items-center sm:justify-between ${
                       task.wasted
                         ? 'bg-dojo-red/5 border border-dojo-red/10'
                         : 'bg-green-500/5 border border-green-500/10'
@@ -51,14 +51,14 @@ export default function SectionAdminOverload() {
                         {task.label}
                       </span>
                     </div>
-                    <span className={`text-xs font-mono ${task.wasted ? 'text-dojo-red' : 'text-green-500'}`}>
+                    <span className={`pl-7 text-xs font-mono sm:pl-0 ${task.wasted ? 'text-dojo-red' : 'text-green-500'}`}>
                       {task.time}
                     </span>
                   </div>
                 ))}
               </div>
 
-              <div className="mt-4 pt-3 border-t border-white/5 flex justify-between items-center">
+              <div className="mt-4 flex flex-col gap-1 border-t border-white/5 pt-3 text-left sm:flex-row sm:items-center sm:justify-between">
                 <span className="text-xs text-gray-500">Daily admin time wasted</span>
                 <span className="text-sm font-mono text-dojo-red font-bold">1 hr 30 min</span>
               </div>

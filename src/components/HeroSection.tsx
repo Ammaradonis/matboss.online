@@ -4,8 +4,26 @@ import DojoBackground from './DojoBackground';
 import { HeroChart, HeroDiagram, HeroInteractive } from './visuals/HeroVisuals';
 
 export default function HeroSection() {
+  const proofStats = [
+    {
+      value: '92%',
+      label: 'Trial No-Shows Never Return',
+      accent: 'text-dojo-red',
+    },
+    {
+      value: '3–5',
+      label: 'Students Lost Monthly per Dojo',
+      accent: 'text-dojo-gold',
+    },
+    {
+      value: '$0',
+      label: 'Extra Ad Spend Required',
+      accent: 'text-white',
+    },
+  ];
+
   return (
-    <section className="relative min-h-screen overflow-hidden gi-texture">
+    <section className="relative min-h-[calc(100svh-3.75rem)] overflow-hidden gi-texture md:min-h-screen">
       {/* Background Effects */}
       <DojoBackground />
 
@@ -15,36 +33,35 @@ export default function HeroSection() {
         <div className="absolute bottom-0 right-0 w-[400px] h-[400px] bg-dojo-gold/3 rounded-full blur-[100px]" />
       </div>
 
-      <div className="relative z-10 max-w-6xl mx-auto px-4 pt-8 pb-16 md:pt-12 md:pb-24">
+      <div className="relative z-10 max-w-6xl mx-auto px-4 pt-10 pb-16 sm:px-6 md:pt-12 md:pb-24">
         {/* Badge */}
-        <div className="text-center mb-6">
-          <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full
-                           bg-dojo-red/10 border border-dojo-red/20 text-xs font-mono text-dojo-red font-bold tracking-wider">
+        <div className="text-center mb-5 sm:mb-6">
+          <span className="inline-flex items-center justify-center gap-2 rounded-full border border-dojo-red/20 bg-dojo-red/10 px-3 py-2 text-center text-[10px] font-mono font-bold leading-relaxed tracking-wider text-dojo-red sm:px-4 sm:py-1.5 sm:text-xs">
             <span className="w-1.5 h-1.5 rounded-full bg-dojo-red animate-pulse" />
             ENROLLMENT AUTOMATION — SAN DIEGO EXCLUSIVE
           </span>
         </div>
 
         {/* Headline */}
-        <div className="text-center mb-4">
+        <div className="text-center mb-5">
           <TypewriterHeadline
             text="San Diego Martial Arts Schools — Stop Losing Students to No-Shows."
             as="h1"
-            className="text-4xl md:text-6xl lg:text-7xl text-white leading-tight"
+            className="text-[2.85rem] leading-[0.95] text-white sm:text-5xl md:text-6xl lg:text-7xl"
             speed={35}
             delay={400}
           />
         </div>
 
         {/* Subheadline */}
-        <p className="text-center text-gray-400 text-base md:text-lg max-w-2xl mx-auto mb-4 leading-relaxed">
+        <p className="text-center text-[15px] text-gray-400 sm:text-base md:text-lg max-w-2xl mx-auto mb-6 leading-relaxed">
           Your San Diego dojo runs on discipline. Your enrollment system should too.
           We automate trial booking, reminders, no-show recovery, and enrollment follow-up
           — so you stop bleeding students and start stacking revenue.
         </p>
 
         {/* Value Prop Chips */}
-        <div className="flex flex-wrap justify-center gap-2 mb-8 md:mb-12">
+        <div className="mb-10 flex flex-wrap justify-center gap-2.5 md:mb-12">
           {[
             'No-Show Recovery',
             'Automated Reminders',
@@ -54,8 +71,7 @@ export default function HeroSection() {
           ].map((chip) => (
             <span
               key={chip}
-              className="px-3 py-1 rounded-full text-xs font-medium
-                         bg-white/5 border border-white/10 text-gray-300"
+              className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-medium text-gray-300 sm:text-xs"
             >
               {chip}
             </span>
@@ -65,10 +81,10 @@ export default function HeroSection() {
         {/* Calendar Section */}
         <div className="max-w-xl mx-auto">
           <div className="text-center mb-5">
-            <h2 className="font-heading text-xl md:text-2xl tracking-wider text-dojo-gold mb-1">
+            <h2 className="font-heading text-lg tracking-wider text-dojo-gold mb-1 sm:text-xl md:text-2xl">
               Book Your Free Leakage Diagnosis Call
             </h2>
-            <p className="text-xs text-gray-500">
+            <p className="text-[11px] text-gray-500 sm:text-xs leading-relaxed">
               30 minutes with Ammar Alkheder, Founder — we'll map every student you're losing and why.
             </p>
           </div>
@@ -77,21 +93,18 @@ export default function HeroSection() {
         </div>
 
         {/* Trust Indicators */}
-        <div className="mt-12 flex flex-wrap justify-center gap-6 md:gap-10 text-center">
-          <div>
-            <div className="text-2xl md:text-3xl font-heading text-dojo-red">92%</div>
-            <div className="text-[10px] text-gray-500 uppercase tracking-wider">Trial No-Shows Never Return</div>
-          </div>
-          <div className="w-px h-12 bg-white/5 hidden md:block" />
-          <div>
-            <div className="text-2xl md:text-3xl font-heading text-dojo-gold">3–5</div>
-            <div className="text-[10px] text-gray-500 uppercase tracking-wider">Students Lost Monthly per Dojo</div>
-          </div>
-          <div className="w-px h-12 bg-white/5 hidden md:block" />
-          <div>
-            <div className="text-2xl md:text-3xl font-heading text-white">$0</div>
-            <div className="text-[10px] text-gray-500 uppercase tracking-wider">Extra Ad Spend Required</div>
-          </div>
+        <div className="mt-10 grid gap-3 text-center sm:mt-12 sm:grid-cols-3 sm:gap-4">
+          {proofStats.map((stat) => (
+            <div
+              key={stat.label}
+              className="rounded-2xl border border-white/5 bg-dojo-dark/55 px-4 py-4 backdrop-blur-sm"
+            >
+              <div className={`text-2xl font-heading sm:text-3xl ${stat.accent}`}>{stat.value}</div>
+              <div className="mt-1 text-[10px] uppercase tracking-[0.22em] text-gray-500">
+                {stat.label}
+              </div>
+            </div>
+          ))}
         </div>
         <HeroChart />
         <HeroDiagram />

@@ -64,14 +64,14 @@ export default function SectionBombshell() {
           >
             {/* Card header */}
             <div className="px-6 py-4 border-b border-white/5 bg-dojo-carbon/50">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h3 className="font-heading text-lg tracking-wider text-white">
                     MatBoss Enrollment Engine
                   </h3>
                   <p className="text-xs text-gray-500">Complete Enrollment Automation</p>
                 </div>
-                <span className="px-2 py-0.5 rounded bg-dojo-red/20 text-[10px] font-mono text-dojo-red font-bold">
+                <span className="w-fit rounded bg-dojo-red/20 px-2 py-0.5 text-[10px] font-mono font-bold text-dojo-red">
                   FOUNDING RATE
                 </span>
               </div>
@@ -87,7 +87,7 @@ export default function SectionBombshell() {
                 <div className="flex items-baseline justify-center gap-1">
                   <span className="text-2xl text-gray-500 font-heading">$</span>
                   <span
-                    className="text-6xl md:text-8xl font-heading text-dojo-red"
+                    className="text-5xl sm:text-6xl md:text-8xl font-heading text-dojo-red"
                     style={{ textShadow: '0 0 40px rgba(220,38,38,0.4)' }}
                   >
                     197

@@ -4,12 +4,12 @@ export default function Footer() {
   const year = new Date().getFullYear();
 
   return (
-    <footer className="py-12 px-4 bg-dojo-dark/50 border-t border-white/5">
+    <footer className="border-t border-white/5 bg-dojo-dark/50 px-4 py-12">
       <div className="max-w-5xl mx-auto">
-        <div className="grid md:grid-cols-3 gap-8 mb-8">
+        <div className="mb-8 grid gap-8 md:grid-cols-3">
           {/* Brand */}
-          <div>
-            <div className="flex items-center gap-2 mb-3">
+          <div className="text-center md:text-left">
+            <div className="mb-3 flex items-center justify-center gap-2 md:justify-start">
               <div className="w-8 h-8 rounded-lg bg-dojo-red flex items-center justify-center">
                 <span className="font-heading text-white text-sm">M</span>
               </div>
@@ -22,7 +22,7 @@ export default function Footer() {
           </div>
 
           {/* Quick Reference */}
-          <div>
+          <div className="text-center md:text-left">
             <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">
               For San Diego Dojos
             </h4>
@@ -35,7 +35,7 @@ export default function Footer() {
           </div>
 
           {/* Contact */}
-          <div>
+          <div className="text-center md:text-left">
             <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">
               Get in Touch
             </h4>
@@ -74,11 +74,11 @@ export default function Footer() {
         </div>
 
         {/* Bottom */}
-        <div className="flex flex-col md:flex-row items-center justify-between gap-4 pt-4 border-t border-white/5">
+        <div className="flex flex-col items-center justify-between gap-4 border-t border-white/5 pt-4 text-center md:flex-row md:text-left">
           <p className="text-[10px] text-gray-600">
             &copy; {year} MatBoss - Stop the Leaks. All rights reserved. San Diego, CA.
           </p>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center justify-center gap-4">
             <Link to="/terms" className="text-[10px] text-gray-600 hover:text-white transition-colors">
               Terms of Service
             </Link>
@@ -89,7 +89,7 @@ export default function Footer() {
               DMARC Policy
             </Link>
           </div>
-          <p className="text-[10px] text-gray-700">
+          <p className="max-w-xs text-[10px] text-gray-700 md:text-right">
             Built for San Diego martial arts school owners who refuse to leave money on the mat.
           </p>
         </div>

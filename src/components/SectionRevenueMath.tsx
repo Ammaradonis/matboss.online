@@ -46,7 +46,7 @@ export default function SectionRevenueMath() {
               {rows.map((row, i) => (
                 <div
                   key={i}
-                  className={`flex items-center justify-between px-5 py-4 ${
+                  className={`flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between ${
                     row.highlight ? 'bg-dojo-red/5' : ''
                   }`}
                 >

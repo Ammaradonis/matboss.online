@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import type { TimeSlot, CalendarDay } from '../types';
 import { fetchAvailability, formatTimeForDisplay, detectTimezone } from '../lib/api';
 import { filterBookableSlots, getSanDiegoDateObject } from '../lib/bookingRules';
@@ -6,7 +6,15 @@ import BookingModal from './BookingModal';
 import BookingSuccess from './BookingSuccess';
 import type { BookingConfirmation } from '../types';
 
-const DAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+const DAYS = [
+  { mobile: 'MO', desktop: 'MON' },
+  { mobile: 'TU', desktop: 'TUE' },
+  { mobile: 'WE', desktop: 'WED' },
+  { mobile: 'TH', desktop: 'THU' },
+  { mobile: 'FR', desktop: 'FRI' },
+  { mobile: 'SA', desktop: 'SAT' },
+  { mobile: 'SU', desktop: 'SUN' },
+];
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
@@ -21,6 +29,7 @@ export default function BookingCalendar() {
   const [showModal, setShowModal] = useState(false);
   const [confirmation, setConfirmation] = useState<BookingConfirmation | null>(null);
   const [now, setNow] = useState(() => new Date());
+  const selectedTimesRef = useRef<HTMLDivElement>(null);
   const timezone = useMemo(() => detectTimezone(), []);
 
   const year = currentDate.getFullYear();
@@ -123,6 +132,16 @@ export default function BookingCalendar() {
     return bookableSlots.filter((s) => s.slot_date === selectedDate);
   }, [selectedDate, bookableSlots]);
 
+  useEffect(() => {
+    if (!selectedDate || typeof window === 'undefined' || window.innerWidth >= 640) return;
+
+    const timeoutId = window.setTimeout(() => {
+      selectedTimesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 120);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [selectedDate]);
+
   function formatDateStr(d: Date): string {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
@@ -174,14 +193,14 @@ export default function BookingCalendar() {
     : null;
 
   return (
-    <div id="booking" className="w-full max-w-lg mx-auto">
+    <div id="booking" className="w-full max-w-lg mx-auto scroll-mt-32">
       {/* Calendar Card */}
-      <div className="bg-dojo-dark/80 backdrop-blur-sm border border-dojo-red/20 rounded-2xl p-5 md:p-6 red-glow">
+      <div className="bg-dojo-dark/80 backdrop-blur-sm border border-dojo-red/20 rounded-[1.75rem] p-4 sm:p-5 md:p-6 red-glow">
         {/* Month Navigation */}
         <div className="flex items-center justify-between mb-6">
           <button
             onClick={() => navigateMonth(-1)}
-            className="w-9 h-9 flex items-center justify-center rounded-full
+            className="w-10 h-10 flex items-center justify-center rounded-full
                        text-gray-400 hover:text-white hover:bg-dojo-red/20
                        transition-all duration-200"
             aria-label="Previous month"
@@ -191,13 +210,13 @@ export default function BookingCalendar() {
             </svg>
           </button>
 
-          <h3 className="text-lg md:text-xl font-heading tracking-wider text-white">
+          <h3 className="text-base sm:text-lg md:text-xl font-heading tracking-wider text-white">
             {MONTH_NAMES[month]} {year}
           </h3>
 
           <button
             onClick={() => navigateMonth(1)}
-            className="w-9 h-9 flex items-center justify-center rounded-full
+            className="w-10 h-10 flex items-center justify-center rounded-full
                        text-gray-400 hover:text-white hover:bg-dojo-red/20
                        transition-all duration-200"
             aria-label="Next month"
@@ -208,21 +227,29 @@ export default function BookingCalendar() {
           </button>
         </div>
 
+        <p className="mb-4 text-center text-[11px] leading-relaxed text-gray-500 sm:text-xs">
+          Tap any highlighted date to reveal the available Pacific Time booking windows.
+        </p>
+
         {/* Day Headers */}
-        <div className="grid grid-cols-7 gap-1 mb-2">
+        <div className="grid grid-cols-7 gap-1.5 mb-2 sm:gap-1">
           {DAYS.map((day) => (
-            <div key={day} className="text-center text-xs font-semibold text-gray-500 py-1">
-              {day}
+            <div
+              key={day.desktop}
+              className="py-1 text-center text-[10px] font-semibold text-gray-500 sm:text-xs"
+            >
+              <span className="sm:hidden">{day.mobile}</span>
+              <span className="hidden sm:inline">{day.desktop}</span>
             </div>
           ))}
         </div>
 
         {/* Calendar Grid */}
-        <div className="grid grid-cols-7 gap-1">
+        <div className="grid grid-cols-7 gap-1.5 sm:gap-1">
           {loading
             ? Array.from({ length: 35 }).map((_, i) => (
-                <div key={i} className="flex items-center justify-center h-10">
-                  <div className="w-8 h-8 rounded-full bg-dojo-carbon animate-pulse" />
+                <div key={i} className="flex aspect-square items-center justify-center">
+                  <div className="h-8 w-8 rounded-xl bg-dojo-carbon animate-pulse sm:h-9 sm:w-9" />
                 </div>
               ))
             : calendarDays.map((day, i) => {
@@ -236,7 +263,7 @@ export default function BookingCalendar() {
                 if (day.isToday) cls += ' today';
 
                 return (
-                  <div key={i} className="flex items-center justify-center h-10">
+                  <div key={i} className="flex aspect-square items-center justify-center">
                     <button
                       className={cls}
                       onClick={() => handleDayClick(day)}
@@ -255,7 +282,7 @@ export default function BookingCalendar() {
         </div>
 
         {/* Timezone */}
-        <div className="mt-4 pt-3 border-t border-white/5 flex items-center gap-2 text-xs text-gray-500">
+        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-white/5 pt-3 text-xs text-gray-500">
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <circle cx="12" cy="12" r="10" strokeWidth="1.5" />
             <path strokeLinecap="round" strokeWidth="1.5" d="M12 6v6l4 2" />
@@ -272,17 +299,22 @@ export default function BookingCalendar() {
 
       {/* Time Slots */}
       {selectedDate && (
-        <div className="mt-4 animate-fade-in">
-          <div className="bg-dojo-dark/60 backdrop-blur-sm border border-dojo-red/10 rounded-xl p-4">
-            <p className="text-sm text-gray-400 mb-3 font-medium">
-              Available times for{' '}
-              <span className="text-white">{formattedSelectedDate}</span>
-            </p>
+        <div id="booking-times" ref={selectedTimesRef} className="mt-4 animate-fade-in scroll-mt-32">
+          <div className="bg-dojo-dark/60 backdrop-blur-sm border border-dojo-red/10 rounded-2xl p-4 sm:p-5">
+            <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-gray-400 font-medium">
+                Available times for{' '}
+                <span className="text-white">{formattedSelectedDate}</span>
+              </p>
+              <span className="inline-flex w-fit items-center rounded-full border border-dojo-red/20 bg-dojo-red/10 px-3 py-1 text-[10px] font-mono uppercase tracking-widest text-dojo-red">
+                {selectedDateSlots.length} {selectedDateSlots.length === 1 ? 'slot' : 'slots'} open
+              </span>
+            </div>
 
             {selectedDateSlots.length === 0 ? (
               <p className="text-sm text-gray-500 italic">No available slots for this date.</p>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {selectedDateSlots.map((slot) => (
                   <button
                     key={slot.id}

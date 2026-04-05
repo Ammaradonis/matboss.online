@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { TimeSlot, BookingFormData, BookingConfirmation } from '../types';
 import { bookSlot, formatTimeForDisplay } from '../lib/api';
 
@@ -23,6 +23,21 @@ export default function BookingModal({ slot, timezone, onClose, onComplete }: Pr
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const schoolNameRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const timeoutId = window.setTimeout(() => {
+      schoolNameRef.current?.focus();
+    }, 120);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.clearTimeout(timeoutId);
+    };
+  }, []);
 
   function update(field: keyof BookingFormData, value: string | number) {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -56,10 +71,10 @@ export default function BookingModal({ slot, timezone, onClose, onComplete }: Pr
 
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="bg-dojo-dark border border-dojo-red/30 rounded-2xl w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto red-glow animate-fade-in">
+      <div className="bg-dojo-dark border border-dojo-red/30 rounded-[1.75rem] w-full max-w-lg max-h-[92vh] sm:max-h-[48rem] overflow-y-auto red-glow animate-fade-in">
         {/* Header */}
-        <div className="p-5 border-b border-white/5">
-          <div className="flex items-center justify-between mb-2">
+        <div className="sticky top-0 z-10 border-b border-white/5 bg-dojo-dark/95 p-4 backdrop-blur-sm sm:p-5">
+          <div className="mb-3 flex items-start justify-between gap-3">
             <h3 className="font-heading text-xl tracking-wider text-white">
               Book Your Leakage Diagnosis
             </h3>
@@ -73,7 +88,7 @@ export default function BookingModal({ slot, timezone, onClose, onComplete }: Pr
               </svg>
             </button>
           </div>
-          <div className="flex items-center gap-3 text-sm">
+          <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center">
             <span className="px-3 py-1 rounded-full bg-dojo-red/20 text-dojo-red font-mono text-xs font-bold">
               {dateDisplay}
             </span>
@@ -84,13 +99,18 @@ export default function BookingModal({ slot, timezone, onClose, onComplete }: Pr
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+        <form onSubmit={handleSubmit} className="p-4 space-y-4 sm:p-5">
+          <p className="text-[11px] leading-relaxed text-gray-500 sm:text-xs">
+            This takes about two minutes. Once you submit, your slot is held and the Zoom details are emailed automatically.
+          </p>
+
           {/* Required Fields */}
           <div>
             <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">
               School Name <span className="text-dojo-red">*</span>
             </label>
             <input
+              ref={schoolNameRef}
               type="text"
               value={form.school_name}
               onChange={(e) => update('school_name', e.target.value)}
@@ -120,7 +140,7 @@ export default function BookingModal({ slot, timezone, onClose, onComplete }: Pr
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">
                 Email <span className="text-dojo-red">*</span>
@@ -155,7 +175,7 @@ export default function BookingModal({ slot, timezone, onClose, onComplete }: Pr
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">
                 Current Students <span className="text-dojo-red">*</span>
@@ -252,31 +272,31 @@ export default function BookingModal({ slot, timezone, onClose, onComplete }: Pr
             </div>
           )}
 
-          <button
-            type="submit"
-            disabled={submitting}
-            className="w-full py-3 rounded-lg bg-dojo-red text-white font-heading text-lg tracking-wider
-                       hover:bg-dojo-crimson transition-all duration-200 red-glow-hover
-                       disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {submitting ? (
-              <span className="flex items-center justify-center gap-2">
-                <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-                Securing Your Slot...
-              </span>
-            ) : (
-              'Confirm Diagnosis Call'
-            )}
-          </button>
+          <div className="sticky bottom-0 -mx-4 mt-6 border-t border-white/5 bg-dojo-dark/95 px-4 pb-4 pt-4 backdrop-blur sm:-mx-5 sm:px-5 sm:pb-5">
+            <button
+              type="submit"
+              disabled={submitting}
+              className="w-full py-3 rounded-xl bg-dojo-red text-white font-heading text-lg tracking-wider
+                         hover:bg-dojo-crimson transition-all duration-200 red-glow-hover
+                         disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {submitting ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Securing Your Slot...
+                </span>
+              ) : (
+                'Confirm Diagnosis Call'
+              )}
+            </button>
 
-          <p className="text-[10px] text-gray-600 text-center">
-            Free 30-minute call with Ammar Alkheder, Founder of MatBoss.
-            <br />
-            No obligation. No sales pitch. Just your enrollment data.
-          </p>
+            <p className="mt-3 text-center text-[10px] text-gray-600 sm:text-[11px]">
+              Free 30-minute call with Ammar Alkheder, Founder of MatBoss. No obligation. No sales pitch.
+            </p>
+          </div>
         </form>
       </div>
     </div>

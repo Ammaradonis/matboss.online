@@ -96,14 +96,14 @@ export default function SectionDetonation() {
         <div className="max-w-2xl mx-auto">
           <div className="relative">
             {/* Vertical line */}
-            <div className="absolute left-6 top-0 bottom-0 w-px bg-gradient-to-b from-dojo-red/40 via-dojo-gold/20 to-transparent" />
+            <div className="absolute bottom-0 left-5 top-0 w-px bg-gradient-to-b from-dojo-red/40 via-dojo-gold/20 to-transparent sm:left-6" />
 
             <div className="space-y-8">
               {timeline.map((step, i) => (
-                <div key={i} className="relative pl-16">
+                <div key={i} className="relative pl-14 sm:pl-16">
                   {/* Icon circle */}
                   <div
-                    className={`absolute left-0 w-12 h-12 rounded-full flex items-center justify-center ${
+                    className={`absolute left-0 flex h-10 w-10 items-center justify-center rounded-full sm:h-12 sm:w-12 ${
                       i === timeline.length - 1
                         ? 'bg-dojo-gold/20 text-dojo-gold border border-dojo-gold/30'
                         : 'bg-dojo-red/10 text-dojo-red border border-dojo-red/20'
@@ -113,11 +113,11 @@ export default function SectionDetonation() {
                   </div>
 
                   <div className="bg-dojo-dark/60 border border-white/5 rounded-xl p-5">
-                    <div className="flex items-center gap-3 mb-2">
+                    <div className="mb-2 flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
                       <span className="text-xs font-mono text-dojo-red font-bold uppercase tracking-widest">
                         {step.days}
                       </span>
-                      <div className="h-px flex-1 bg-white/5" />
+                      <div className="hidden h-px flex-1 bg-white/5 sm:block" />
                     </div>
                     <h3 className="font-heading text-lg tracking-wider text-white mb-2">
                       {step.title}

@@ -2,19 +2,18 @@ import { ClassifiedChart, ClassifiedDiagram, ClassifiedInteractive } from '../vi
 
 export default function SectionClassified() {
   return (
-    <section className="relative min-h-[80vh] overflow-hidden gi-texture flex items-center">
+    <section className="relative flex min-h-[75vh] items-center overflow-hidden gi-texture md:min-h-[80vh]">
       {/* Background effects */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-dojo-red/5 rounded-full blur-[120px]" />
         <div className="absolute bottom-0 right-0 w-[400px] h-[400px] bg-dojo-gold/3 rounded-full blur-[100px]" />
       </div>
 
-      <div className="relative z-10 max-w-5xl mx-auto px-4 py-16 md:py-24">
+      <div className="relative z-10 max-w-5xl mx-auto px-4 py-16 sm:px-6 md:py-24">
         {/* Classified badge */}
         <div className="text-center mb-6">
           <span
-            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full
-                       bg-dojo-red/10 border border-dojo-red/30 text-xs font-mono text-dojo-red font-bold tracking-wider animate-glow"
+            className="inline-flex items-center justify-center gap-2 rounded-full border border-dojo-red/30 bg-dojo-red/10 px-3 py-2 text-center text-[10px] font-mono font-bold leading-relaxed tracking-wider text-dojo-red animate-glow sm:px-4 sm:py-1.5 sm:text-xs"
           >
             <span className="w-1.5 h-1.5 rounded-full bg-dojo-red animate-pulse" />
             CLASSIFIED — NOW DECLASSIFIED
@@ -22,7 +21,7 @@ export default function SectionClassified() {
         </div>
 
         {/* Main headline */}
-        <h1 className="font-heading text-4xl md:text-6xl lg:text-7xl text-white tracking-wide text-center mb-6 leading-tight">
+        <h1 className="mb-6 text-center font-heading text-[2.75rem] leading-[0.96] tracking-wide text-white sm:text-5xl md:text-6xl lg:text-7xl">
           We Just Published the One Number
           <br />
           <span className="text-dojo-red">Every San Diego Dojo Owner</span>
@@ -30,14 +29,14 @@ export default function SectionClassified() {
           Will Be Talking About This Month.
         </h1>
 
-        <p className="text-center text-gray-400 text-base md:text-lg max-w-2xl mx-auto mb-8 leading-relaxed">
+        <p className="text-center text-[15px] text-gray-400 sm:text-base md:text-lg max-w-2xl mx-auto mb-8 leading-relaxed">
           For weeks, San Diego academy owners have been asking us the same question.
           Today, we're answering it — and the number might break your brain.
           Scroll down. But don't say we didn't warn you.
         </p>
 
         {/* Warning box */}
-        <div className="max-w-xl mx-auto p-5 rounded-xl bg-dojo-dark/80 border border-dojo-red/20 text-center">
+        <div className="max-w-xl mx-auto rounded-2xl border border-dojo-red/20 bg-dojo-dark/80 p-5 text-center">
           <div className="flex items-center justify-center gap-2 mb-3">
             <svg
               className="w-5 h-5 text-dojo-red animate-pulse"
@@ -56,7 +55,7 @@ export default function SectionClassified() {
               Content Warning
             </span>
           </div>
-          <p className="text-sm text-gray-400">
+          <p className="text-sm leading-relaxed text-gray-400">
             The pricing below has caused visible frustration among enrollment automation vendors
             across California. If you sell overpriced CRM retainers to martial arts schools,
             <strong className="text-white"> close this tab now.</strong>

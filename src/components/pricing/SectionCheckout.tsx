@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
 import type { Appearance, PaymentIntent } from '@stripe/stripe-js';
@@ -10,12 +10,12 @@ const CHECKOUT_STORAGE_KEY = 'matboss-pricing-checkout';
 const stripeAppearance: Appearance = {
   theme: 'night',
   variables: {
-    colorPrimary: '#dc2626',
+    colorPrimary: '#2563eb',
     colorBackground: '#1a1a1a',
     colorText: '#ffffff',
     colorTextSecondary: '#9ca3af',
     colorTextPlaceholder: '#4b5563',
-    colorDanger: '#dc2626',
+    colorDanger: '#f87171',
     fontFamily: '"Inter", system-ui, sans-serif',
     borderRadius: '12px',
     spacingUnit: '4px',
@@ -29,8 +29,8 @@ const stripeAppearance: Appearance = {
       padding: '12px 16px',
     },
     '.Input:focus': {
-      border: '1px solid #dc2626',
-      boxShadow: 'none',
+      border: '1px solid #2563eb',
+      boxShadow: '0 0 0 2px rgba(37,99,235,0.15)',
     },
     '.Label': {
       fontFamily: '"JetBrains Mono", "Fira Code", monospace',
@@ -46,7 +46,7 @@ const stripeAppearance: Appearance = {
     },
     '.Tab--selected': {
       backgroundColor: '#1a1a1a',
-      border: '1px solid #dc2626',
+      border: '1px solid #2563eb',
       color: '#ffffff',
     },
     '.Tab:hover': {
@@ -131,6 +131,7 @@ function describeReturnedIntentStatus(status: PaymentIntent.Status): {
 
 export default function SectionCheckout() {
   const returnClientSecret = getReturnClientSecret();
+  const paymentPanelRef = useRef<HTMLDivElement>(null);
   const [formData, setFormData] = useState<CheckoutFormData>(() => readStoredFormData());
   const [errors, setErrors] = useState<Partial<CheckoutFormData>>({});
   const [clientSecret, setClientSecret] = useState<string | null>(returnClientSecret);
@@ -152,8 +153,7 @@ export default function SectionCheckout() {
     if (!formData.school_name.trim()) newErrors.school_name = 'Required';
     if (!formData.owner_name.trim()) newErrors.owner_name = 'Required';
     if (!formData.email.trim()) newErrors.email = 'Required';
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email))
-      newErrors.email = 'Invalid email';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) newErrors.email = 'Invalid email';
     if (!formData.phone.trim()) newErrors.phone = 'Required';
     if (!formData.num_students.trim()) newErrors.num_students = 'Required';
     if (!formData.current_software.trim()) newErrors.current_software = 'Required';
@@ -206,6 +206,18 @@ export default function SectionCheckout() {
     };
   }, [returnClientSecret]);
 
+  useEffect(() => {
+    if (!clientSecret || returnClientSecret || typeof window === 'undefined' || window.innerWidth >= 1024) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      paymentPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 180);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [clientSecret, returnClientSecret]);
+
   const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
@@ -245,6 +257,11 @@ export default function SectionCheckout() {
   const handlePaymentStateChange = useCallback((nextState: Exclude<CheckoutCompletionState, null>) => {
     setPaymentState(nextState);
     setPaymentError(null);
+    // Scroll to the confirmation panel — the section re-renders and the user
+    // may be mid-form; bring them to the top of the checkout section.
+    setTimeout(() => {
+      document.getElementById('checkout')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 80);
   }, []);
 
   const inputClass = (field: keyof CheckoutFormData) =>
@@ -256,8 +273,17 @@ export default function SectionCheckout() {
   const schoolName = formData.school_name.trim();
   const customerEmail = formData.email.trim();
   const isFormLocked = Boolean(clientSecret);
+  const deploymentSteps = [
+    'Complete the academy profile once.',
+    'Choose card, wallet, or ACH in the secure payment step.',
+    'We start mapping your enrollment leaks within 24 hours of payment clearing.',
+  ];
+  const trustSignals = [
+    '256-bit SSL Encrypted',
+    'No Long-Term Contracts',
+    'Live Within 72 Hours',
+  ];
 
-  // ── Payment Status State ──
   if (checkingPaymentStatus || paymentState) {
     const isProcessing = checkingPaymentStatus || paymentState === 'processing';
     const title = checkingPaymentStatus
@@ -267,34 +293,32 @@ export default function SectionCheckout() {
         : 'Payment Confirmed';
 
     return (
-      <section id="checkout" className="py-20 md:py-28 px-4 relative overflow-hidden">
+      <section id="checkout" className="relative scroll-mt-32 overflow-hidden px-4 py-20 md:py-28">
         <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[500px] bg-dojo-red/4 rounded-full blur-[150px]" />
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 h-[500px] w-[700px] rounded-full bg-dojo-red/4 blur-[150px]" />
         </div>
-        <div className="max-w-lg mx-auto reveal">
-          <div className="bg-dojo-dark/80 border border-white/5 rounded-2xl p-8 text-center">
+        <div className="mx-auto max-w-lg reveal visible">
+          <div className="rounded-[1.75rem] border border-white/5 bg-dojo-dark/80 p-6 text-center sm:p-8">
             <div
-              className={`w-16 h-16 mx-auto mb-6 rounded-full border-2 flex items-center justify-center ${
+              className={`mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full border-2 ${
                 isProcessing
-                  ? 'bg-dojo-gold/10 border-dojo-gold/40'
-                  : 'bg-green-500/10 border-green-500/40'
+                  ? 'border-dojo-gold/40 bg-dojo-gold/10'
+                  : 'border-green-500/40 bg-green-500/10'
               }`}
             >
               {isProcessing ? (
-                <svg className="w-8 h-8 text-dojo-gold animate-spin" viewBox="0 0 24 24" fill="none">
+                <svg className="h-8 w-8 animate-spin text-dojo-gold" viewBox="0 0 24 24" fill="none">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
               ) : (
-                <svg className="w-8 h-8 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="h-8 w-8 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               )}
             </div>
-            <h2 className="font-heading text-3xl md:text-4xl text-white tracking-wide mb-3">
-              {title}
-            </h2>
-            <p className="text-gray-400 text-base leading-relaxed mb-2">
+            <h2 className="mb-3 font-heading text-3xl tracking-wide text-white md:text-4xl">{title}</h2>
+            <p className="mb-2 text-base leading-relaxed text-gray-400">
               {checkingPaymentStatus
                 ? 'We are pulling the latest status from Stripe.'
                 : isProcessing
@@ -305,14 +329,15 @@ export default function SectionCheckout() {
                     ? `Welcome to MatBoss, ${ownerName}.`
                     : 'Your first payment cleared successfully.'}
             </p>
-            <p className="text-gray-500 text-sm leading-relaxed mb-6">
+            <p className="mb-6 text-sm leading-relaxed text-gray-500">
               {checkingPaymentStatus ? (
                 'This only takes a moment.'
               ) : isProcessing ? (
                 <>
                   Stripe can take up to 4 business days to confirm an ACH debit.
-                  {schoolName ? ` We will start mapping ${schoolName} as soon as the first payment clears.` : ' We will start mapping your academy as soon as the first payment clears.'}
-                  {' '}
+                  {schoolName
+                    ? ` We will start mapping ${schoolName} as soon as the first payment clears.`
+                    : ' We will start mapping your academy as soon as the first payment clears.'}{' '}
                   Your monthly $197 subscription is created automatically after that first payment succeeds.
                   {customerEmail ? ` Check ${customerEmail} for mandate or verification emails.` : ''}
                 </>
@@ -326,15 +351,15 @@ export default function SectionCheckout() {
               )}
             </p>
             <div
-              className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border text-xs ${
+              className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs ${
                 isProcessing
-                  ? 'bg-dojo-gold/10 border-dojo-gold/30 text-dojo-gold'
-                  : 'bg-dojo-carbon border-white/5 text-gray-400'
+                  ? 'border-dojo-gold/30 bg-dojo-gold/10 text-dojo-gold'
+                  : 'border-white/5 bg-dojo-carbon text-gray-400'
               }`}
             >
               <div
-                className={`w-2 h-2 rounded-full ${
-                  isProcessing ? 'bg-dojo-gold animate-pulse' : 'bg-green-400 animate-pulse'
+                className={`h-2 w-2 rounded-full ${
+                  isProcessing ? 'animate-pulse bg-dojo-gold' : 'animate-pulse bg-green-400'
                 }`}
               />
               {isProcessing ? 'Waiting for bank settlement' : 'Deployment pipeline activated'}
@@ -345,309 +370,338 @@ export default function SectionCheckout() {
     );
   }
 
-  // ── Main Checkout ──
   return (
-    <section id="checkout" className="py-20 md:py-28 px-4 relative overflow-hidden">
+    <section id="checkout" className="relative scroll-mt-32 overflow-hidden px-4 py-20 md:py-28">
       <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[500px] bg-dojo-red/4 rounded-full blur-[150px]" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 h-[500px] w-[700px] rounded-full bg-dojo-red/4 blur-[150px]" />
       </div>
 
-      <div className="max-w-5xl mx-auto reveal">
-        <div className="text-center mb-12">
+      <div className="mx-auto max-w-5xl reveal">
+        <div className="mb-12 text-center">
           <span
-            className="inline-block px-3 py-1 rounded-full bg-dojo-red/10 border border-dojo-red/20
-                       text-[10px] font-mono text-dojo-red uppercase tracking-widest mb-4"
+            className="mb-4 inline-block rounded-full border border-dojo-red/20 bg-dojo-red/10 px-3 py-1 text-[10px] font-mono uppercase tracking-widest text-dojo-red"
           >
             Deploy
           </span>
 
-          <h2 className="font-heading text-3xl md:text-5xl text-white tracking-wide mb-4 leading-tight max-w-3xl mx-auto">
+          <h2 className="mx-auto mb-4 max-w-3xl font-heading text-3xl leading-tight tracking-wide text-white md:text-5xl">
             Your San Diego Academy's Enrollment Engine
             <span className="text-dojo-red"> Is One Form Away.</span>
           </h2>
 
-          <p className="text-gray-400 text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
-            Fill in your details below. Once confirmed, we begin system mapping
-            within 24 hours. No contracts. No lock-in. Cancel any time.
+          <p className="mx-auto max-w-2xl text-[15px] leading-relaxed text-gray-400 sm:text-base md:text-lg">
+            Fill in your details below. Once confirmed, we begin system mapping within 24 hours.
+            No contracts. No lock-in. Cancel any time.
           </p>
         </div>
 
-        {/* Checkout form */}
-        <div className="max-w-lg mx-auto">
-          <div className="bg-dojo-dark/80 border border-white/5 rounded-2xl overflow-hidden">
-            {/* Form header */}
-            <div className="px-6 py-4 border-b border-white/5 bg-dojo-carbon/50">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-dojo-red flex items-center justify-center">
-                    <span className="font-heading text-white text-sm">M</span>
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
+          <div className="order-2 mx-auto w-full max-w-2xl lg:order-1 lg:max-w-none">
+            <div className="overflow-hidden rounded-[1.75rem] border border-white/5 bg-dojo-dark/80">
+              <div className="border-b border-white/5 bg-dojo-carbon/50 px-4 py-4 sm:px-6">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-dojo-red">
+                      <span className="font-heading text-sm text-white">M</span>
+                    </div>
+                    <div>
+                      <h3 className="font-heading text-base tracking-wider text-white">
+                        MatBoss Enrollment Engine
+                      </h3>
+                      <p className="text-[10px] text-gray-500">
+                        Founding Rate — San Diego Exclusive
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 rounded-2xl border border-dojo-red/20 bg-dojo-red/10 px-4 py-3 sm:text-right">
+                    <div>
+                      <div className="text-[10px] font-mono uppercase tracking-widest text-gray-500">
+                        Due today
+                      </div>
+                      <div className="font-heading text-xl text-dojo-red">$316</div>
+                    </div>
+                    <div className="h-10 w-px bg-white/5" />
+                    <div>
+                      <div className="font-heading text-lg text-white">$197</div>
+                      <div className="text-[10px] text-gray-500">monthly after setup</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <form onSubmit={handleCheckout} className="space-y-4 px-4 py-5 sm:px-6 sm:py-6">
+                <div className="rounded-2xl border border-white/5 bg-dojo-carbon/35 p-4 text-[11px] leading-relaxed text-gray-400 sm:text-xs">
+                  Enter the academy details first. Once the secure payment step appears, you can
+                  finish with card, Apple Pay, Google Pay, Venmo, Cash App Pay, Klarna, or ACH.
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1.5 block text-xs font-mono uppercase tracking-widest text-gray-500">
+                      School Name
+                    </label>
+                    <input
+                      type="text"
+                      name="school_name"
+                      value={formData.school_name}
+                      onChange={handleChange}
+                      placeholder="e.g. San Diego BJJ Academy"
+                      className={inputClass('school_name')}
+                      disabled={isFormLocked}
+                    />
+                    {errors.school_name && (
+                      <p className="mt-1 text-[10px] text-dojo-red">{errors.school_name}</p>
+                    )}
                   </div>
                   <div>
-                    <h3 className="font-heading text-base tracking-wider text-white">
-                      MatBoss Enrollment Engine
-                    </h3>
-                    <p className="text-[10px] text-gray-500">
-                      Founding Rate — San Diego Exclusive
-                    </p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="font-heading text-lg text-dojo-red">$197</div>
-                  <div className="text-[10px] text-gray-500">/month</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Form body */}
-            <form onSubmit={handleCheckout} className="px-6 py-6 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-mono text-gray-500 uppercase tracking-widest mb-1.5">
-                    School Name
-                  </label>
-                  <input
-                    type="text"
-                    name="school_name"
-                    value={formData.school_name}
-                    onChange={handleChange}
-                    placeholder="e.g. San Diego BJJ Academy"
-                    className={inputClass('school_name')}
-                    disabled={isFormLocked}
-                  />
-                  {errors.school_name && (
-                    <p className="text-[10px] text-dojo-red mt-1">{errors.school_name}</p>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-xs font-mono text-gray-500 uppercase tracking-widest mb-1.5">
-                    Owner Name
-                  </label>
-                  <input
-                    type="text"
-                    name="owner_name"
-                    value={formData.owner_name}
-                    onChange={handleChange}
-                    placeholder="Full name"
-                    className={inputClass('owner_name')}
-                    disabled={isFormLocked}
-                  />
-                  {errors.owner_name && (
-                    <p className="text-[10px] text-dojo-red mt-1">{errors.owner_name}</p>
-                  )}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-mono text-gray-500 uppercase tracking-widest mb-1.5">
-                    Email
-                  </label>
-                  <input
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    placeholder="you@yourdojo.com"
-                    className={inputClass('email')}
-                    disabled={isFormLocked}
-                  />
-                  {errors.email && (
-                    <p className="text-[10px] text-dojo-red mt-1">{errors.email}</p>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-xs font-mono text-gray-500 uppercase tracking-widest mb-1.5">
-                    Phone
-                  </label>
-                  <input
-                    type="tel"
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleChange}
-                    placeholder="(619) 000-0000"
-                    className={inputClass('phone')}
-                    disabled={isFormLocked}
-                  />
-                  {errors.phone && (
-                    <p className="text-[10px] text-dojo-red mt-1">{errors.phone}</p>
-                  )}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-mono text-gray-500 uppercase tracking-widest mb-1.5">
-                    Current Students
-                  </label>
-                  <input
-                    type="number"
-                    name="num_students"
-                    value={formData.num_students}
-                    onChange={handleChange}
-                    placeholder="e.g. 80"
-                    className={inputClass('num_students')}
-                    disabled={isFormLocked}
-                  />
-                  {errors.num_students && (
-                    <p className="text-[10px] text-dojo-red mt-1">{errors.num_students}</p>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-xs font-mono text-gray-500 uppercase tracking-widest mb-1.5">
-                    Current Software
-                  </label>
-                  <input
-                    type="text"
-                    name="current_software"
-                    value={formData.current_software}
-                    onChange={handleChange}
-                    placeholder="e.g. Zen Planner, MindBody"
-                    className={inputClass('current_software')}
-                    disabled={isFormLocked}
-                  />
-                  {errors.current_software && (
-                    <p className="text-[10px] text-dojo-red mt-1">{errors.current_software}</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Error from payment intent creation or return status lookup */}
-              {paymentError && (
-                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
-                  {paymentError}
-                </div>
-              )}
-
-              {/* Checkout button — only when payment element is NOT yet loaded */}
-              {!clientSecret && (
-                <div className="space-y-3 mt-2">
-                  <button
-                    type="submit"
-                    disabled={paymentLoading}
-                    className="w-full py-3.5 rounded-xl bg-dojo-red text-white font-heading text-lg tracking-wider
-                               hover:bg-dojo-crimson transition-all red-glow-hover
-                               disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {paymentLoading ? (
-                      <span className="flex items-center justify-center gap-2">
-                        <svg className="animate-spin w-5 h-5" viewBox="0 0 24 24" fill="none">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                        </svg>
-                        Setting up payment...
-                      </span>
-                    ) : (
-                      'Check Out'
-                    )}
-                  </button>
-
-                  <p className="text-[11px] text-gray-500 leading-relaxed">
-                    All payment methods save for automatic $197 monthly billing.
-                  </p>
-                </div>
-              )}
-            </form>
-
-            {/* ── Stripe Payment Element ── */}
-            {clientSecret && (
-              <div className="px-6 pb-6">
-                <div className="border-t border-white/5 pt-6">
-                  <div className="mb-4 p-4 rounded-xl bg-dojo-carbon/50 border border-white/5">
-                    <p className="text-xs font-mono text-dojo-gold uppercase tracking-widest mb-2">
-                      Choose Your Payment Method
-                    </p>
-                    <p className="text-sm text-gray-400 leading-relaxed">
-                      Pay instantly with Apple Pay, Google Pay, Venmo, Cash App Pay, or Klarna,
-                      or use a card. Select your preferred method below.
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-2 mb-4">
-                    <svg className="w-4 h-4 text-dojo-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                      />
-                    </svg>
-                    <span className="text-xs font-mono text-gray-500 uppercase tracking-widest">
-                      Secure Payment
-                    </span>
-                  </div>
-
-                  <Elements
-                    stripe={stripePromise}
-                    options={{
-                      clientSecret,
-                      appearance: stripeAppearance,
-                    }}
-                  >
-                    <StripePaymentForm
-                      onPaymentStateChange={handlePaymentStateChange}
-                      formData={formData}
+                    <label className="mb-1.5 block text-xs font-mono uppercase tracking-widest text-gray-500">
+                      Owner Name
+                    </label>
+                    <input
+                      type="text"
+                      name="owner_name"
+                      value={formData.owner_name}
+                      onChange={handleChange}
+                      placeholder="Full name"
+                      className={inputClass('owner_name')}
+                      disabled={isFormLocked}
                     />
-                  </Elements>
-
-                  {/* Order summary */}
-                  <div className="mt-4 p-4 rounded-xl bg-dojo-carbon/50 border border-white/5">
-                    <div className="flex items-center justify-between text-sm mb-2">
-                      <span className="text-gray-400">MatBoss Enrollment Engine</span>
-                      <span className="text-white font-mono">$197/mo</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm mb-2">
-                      <span className="text-gray-400">Setup & Implementation</span>
-                      <span className="text-white font-mono">$119</span>
-                    </div>
-                    <div className="border-t border-white/5 pt-2 mt-2 flex items-center justify-between">
-                      <span className="text-white font-semibold text-sm">Due today</span>
-                      <span className="text-dojo-red font-heading text-lg">$316</span>
-                    </div>
-                    <p className="text-[10px] text-gray-600 mt-2">
-                      Then $197/month to the saved payment method until canceled.
-                    </p>
+                    {errors.owner_name && (
+                      <p className="mt-1 text-[10px] text-dojo-red">{errors.owner_name}</p>
+                    )}
                   </div>
                 </div>
-              </div>
-            )}
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1.5 block text-xs font-mono uppercase tracking-widest text-gray-500">
+                      Email
+                    </label>
+                    <input
+                      type="email"
+                      name="email"
+                      value={formData.email}
+                      onChange={handleChange}
+                      placeholder="you@yourdojo.com"
+                      className={inputClass('email')}
+                      disabled={isFormLocked}
+                    />
+                    {errors.email && (
+                      <p className="mt-1 text-[10px] text-dojo-red">{errors.email}</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-xs font-mono uppercase tracking-widest text-gray-500">
+                      Phone
+                    </label>
+                    <input
+                      type="tel"
+                      name="phone"
+                      value={formData.phone}
+                      onChange={handleChange}
+                      placeholder="(619) 000-0000"
+                      className={inputClass('phone')}
+                      disabled={isFormLocked}
+                    />
+                    {errors.phone && (
+                      <p className="mt-1 text-[10px] text-dojo-red">{errors.phone}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1.5 block text-xs font-mono uppercase tracking-widest text-gray-500">
+                      Current Students
+                    </label>
+                    <input
+                      type="number"
+                      name="num_students"
+                      value={formData.num_students}
+                      onChange={handleChange}
+                      placeholder="e.g. 80"
+                      className={inputClass('num_students')}
+                      disabled={isFormLocked}
+                    />
+                    {errors.num_students && (
+                      <p className="mt-1 text-[10px] text-dojo-red">{errors.num_students}</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-xs font-mono uppercase tracking-widest text-gray-500">
+                      Current Software
+                    </label>
+                    <input
+                      type="text"
+                      name="current_software"
+                      value={formData.current_software}
+                      onChange={handleChange}
+                      placeholder="e.g. Zen Planner, MindBody"
+                      className={inputClass('current_software')}
+                      disabled={isFormLocked}
+                    />
+                    {errors.current_software && (
+                      <p className="mt-1 text-[10px] text-dojo-red">{errors.current_software}</p>
+                    )}
+                  </div>
+                </div>
+
+                {paymentError && (
+                  <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-400">
+                    {paymentError}
+                  </div>
+                )}
+
+                {!clientSecret && (
+                  <div className="mt-2 space-y-3">
+                    <button
+                      type="submit"
+                      disabled={paymentLoading}
+                      className="w-full rounded-xl bg-dojo-red py-3.5 text-lg font-heading tracking-wider text-white transition-all hover:bg-dojo-crimson red-glow-hover disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {paymentLoading ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                          </svg>
+                          Setting up payment...
+                        </span>
+                      ) : (
+                        'Continue to Secure Payment'
+                      )}
+                    </button>
+
+                    <p className="text-[11px] leading-relaxed text-gray-500">
+                      All supported payment methods save automatically for the recurring $197 monthly subscription.
+                    </p>
+                  </div>
+                )}
+              </form>
+
+              {clientSecret && (
+                <div ref={paymentPanelRef} id="checkout-payment" className="px-4 pb-5 sm:px-6 sm:pb-6">
+                  <div className="border-t border-white/5 pt-6">
+                    <div className="mb-4 rounded-2xl border border-white/5 bg-dojo-carbon/50 p-4 sm:p-5">
+                      <p className="mb-2 text-xs font-mono uppercase tracking-widest text-dojo-gold">
+                        Choose Your Payment Method
+                      </p>
+                      <p className="text-sm leading-relaxed text-gray-400">
+                        Pay instantly with Apple Pay, Google Pay, Venmo, Cash App Pay, or Klarna,
+                        or use a card. Select your preferred method below.
+                      </p>
+                    </div>
+
+                    <div className="mb-4 flex flex-wrap items-center gap-2">
+                      <svg className="h-4 w-4 text-dojo-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                        />
+                      </svg>
+                      <span className="text-xs font-mono uppercase tracking-widest text-gray-500">
+                        Secure Payment
+                      </span>
+                    </div>
+
+                    <Elements
+                      stripe={stripePromise}
+                      options={{
+                        clientSecret,
+                        appearance: stripeAppearance,
+                      }}
+                    >
+                      <StripePaymentForm
+                        onPaymentStateChange={handlePaymentStateChange}
+                        formData={formData}
+                      />
+                    </Elements>
+
+                    <div className="mt-4 rounded-xl border border-white/5 bg-dojo-carbon/50 p-4 lg:hidden">
+                      <div className="mb-2 flex items-center justify-between text-sm">
+                        <span className="text-gray-400">MatBoss Enrollment Engine</span>
+                        <span className="font-mono text-white">$197/mo</span>
+                      </div>
+                      <div className="mb-2 flex items-center justify-between text-sm">
+                        <span className="text-gray-400">Setup &amp; Implementation</span>
+                        <span className="font-mono text-white">$119</span>
+                      </div>
+                      <div className="mt-2 flex items-center justify-between border-t border-white/5 pt-2">
+                        <span className="text-sm font-semibold text-white">Due today</span>
+                        <span className="font-heading text-lg text-dojo-red">$316</span>
+                      </div>
+                      <p className="mt-2 text-[10px] text-gray-600">
+                        Then $197/month to the saved payment method until canceled.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Trust signals */}
-          <div className="mt-6 flex flex-wrap justify-center gap-6 text-center">
-            <div className="flex items-center gap-2 text-xs text-gray-500">
-              <svg className="w-4 h-4 text-dojo-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-                />
-              </svg>
-              256-bit SSL Encrypted
+          <aside className="order-1 space-y-4 lg:order-2 lg:sticky lg:top-24">
+            <div className="rounded-2xl border border-dojo-red/15 bg-dojo-dark/80 p-5">
+              <div className="mb-3 text-xs font-mono uppercase tracking-widest text-dojo-gold">
+                Smooth Deployment
+              </div>
+              <ul className="space-y-3">
+                {deploymentSteps.map((step) => (
+                  <li key={step} className="flex items-start gap-3 text-sm leading-relaxed text-gray-300">
+                    <span className="mt-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-dojo-red/15 text-[10px] font-mono text-dojo-red">
+                      ✓
+                    </span>
+                    <span>{step}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
-            <div className="flex items-center gap-2 text-xs text-gray-500">
-              <svg className="w-4 h-4 text-dojo-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-              No Long-Term Contracts
+
+            <div className="rounded-2xl border border-white/5 bg-dojo-dark/80 p-5">
+              <div className="mb-3 text-xs font-mono uppercase tracking-widest text-gray-500">
+                Order Summary
+              </div>
+              <div className="mb-2 flex items-center justify-between text-sm">
+                <span className="text-gray-400">First month</span>
+                <span className="font-mono text-white">$197</span>
+              </div>
+              <div className="mb-2 flex items-center justify-between text-sm">
+                <span className="text-gray-400">Setup</span>
+                <span className="font-mono text-white">$119</span>
+              </div>
+              <div className="mt-3 border-t border-white/5 pt-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-white">Due today</span>
+                  <span className="font-heading text-xl text-dojo-red">$316</span>
+                </div>
+                <p className="mt-2 text-[11px] leading-relaxed text-gray-500">
+                  After checkout, billing continues at $197/month until canceled.
+                </p>
+              </div>
             </div>
-            <div className="flex items-center gap-2 text-xs text-gray-500">
-              <svg className="w-4 h-4 text-dojo-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M13 10V3L4 14h7v7l9-11h-7z"
-                />
-              </svg>
-              Live Within 72 Hours
+
+            <div className="rounded-2xl border border-white/5 bg-dojo-dark/80 p-5">
+              <div className="mb-3 flex flex-wrap gap-2">
+                {trustSignals.map((signal) => (
+                  <span
+                    key={signal}
+                    className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-mono uppercase tracking-widest text-gray-400"
+                  >
+                    {signal}
+                  </span>
+                ))}
+              </div>
+              <a
+                href="/bank-transfer"
+                className="inline-flex w-full items-center justify-center rounded-xl border border-dojo-gold/20 bg-dojo-gold/10 px-4 py-3 text-center text-sm font-heading tracking-wider text-dojo-gold transition-colors hover:bg-dojo-gold/20"
+              >
+                Prefer Bank Transfer Instead?
+              </a>
             </div>
-          </div>
+          </aside>
         </div>
       </div>
     </section>

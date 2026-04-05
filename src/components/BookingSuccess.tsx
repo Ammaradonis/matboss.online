@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { BookingConfirmation } from '../types';
 
 interface Props {
@@ -6,6 +7,7 @@ interface Props {
 }
 
 export default function BookingSuccess({ confirmation, onReset }: Props) {
+  const [copied, setCopied] = useState(false);
   const dateDisplay = new Date(confirmation.slot_date + 'T12:00:00').toLocaleDateString('en-US', {
     weekday: 'long',
     month: 'long',
@@ -44,6 +46,18 @@ export default function BookingSuccess({ confirmation, onReset }: Props) {
     URL.revokeObjectURL(url);
   }
 
+  async function copyBookingId() {
+    if (!navigator.clipboard) return;
+
+    try {
+      await navigator.clipboard.writeText(confirmation.booking_id);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
+    } catch {
+      setCopied(false);
+    }
+  }
+
   return (
     <div className="w-full max-w-lg mx-auto animate-fade-in">
       <div className="bg-dojo-dark/80 backdrop-blur-sm border border-dojo-gold/30 rounded-2xl p-6 md:p-8 gold-glow text-center">
@@ -63,24 +77,33 @@ export default function BookingSuccess({ confirmation, onReset }: Props) {
 
         {/* Booking Details */}
         <div className="bg-dojo-black/50 rounded-xl p-4 mb-6 text-left space-y-3">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <span className="text-xs text-gray-500 uppercase tracking-wider">Booking ID</span>
-            <span className="font-mono text-sm text-dojo-gold font-bold">{confirmation.booking_id}</span>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-mono text-sm text-dojo-gold font-bold break-all">{confirmation.booking_id}</span>
+              <button
+                type="button"
+                onClick={copyBookingId}
+                className="rounded-full border border-dojo-gold/20 bg-dojo-gold/10 px-2.5 py-1 text-[10px] font-mono uppercase tracking-widest text-dojo-gold transition-colors hover:bg-dojo-gold/20"
+              >
+                {copied ? 'Copied' : 'Copy'}
+              </button>
+            </div>
           </div>
           <div className="h-px bg-white/5" />
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
             <span className="text-xs text-gray-500 uppercase tracking-wider">Date</span>
             <span className="text-sm text-white">{dateDisplay}</span>
           </div>
           <div className="h-px bg-white/5" />
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
             <span className="text-xs text-gray-500 uppercase tracking-wider">School</span>
             <span className="text-sm text-white">{confirmation.school_name}</span>
           </div>
           <div className="h-px bg-white/5" />
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
             <span className="text-xs text-gray-500 uppercase tracking-wider">Confirmation Sent To</span>
-            <span className="text-sm text-white">{confirmation.email}</span>
+            <span className="text-sm text-white break-all">{confirmation.email}</span>
           </div>
         </div>
 
