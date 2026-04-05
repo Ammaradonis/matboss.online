@@ -433,7 +433,7 @@ export default function SectionCheckout() {
               <form onSubmit={handleCheckout} className="space-y-4 px-4 py-5 sm:px-6 sm:py-6">
                 <div className="rounded-2xl border border-white/5 bg-dojo-carbon/35 p-4 text-[11px] leading-relaxed text-gray-400 sm:text-xs">
                   Enter the academy details first. Once the secure payment step appears, you can
-                  finish with card, Apple Pay, Google Pay, Venmo, Amazon Pay, Klarna, or ACH.
+                  finish with card, Apple Pay, Google Pay, Amazon Pay, Klarna, or ACH.
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -588,7 +588,7 @@ export default function SectionCheckout() {
                         Choose Your Payment Method
                       </p>
                       <p className="text-sm leading-relaxed text-gray-400">
-                        Pay instantly with Apple Pay, Google Pay, Venmo, Amazon Pay, or Klarna,
+                        Pay instantly with Apple Pay, Google Pay, Amazon Pay, or Klarna,
                         or use a card. Select your preferred method below.
                       </p>
                     </div>

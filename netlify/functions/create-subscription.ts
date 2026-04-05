@@ -57,7 +57,7 @@ export default async (req: Request, _context: Context) => {
       amount: TOTAL,
       currency: 'usd',
       customer: customer.id,
-      payment_method_types: ['card', 'us_bank_account', 'venmo', 'amazon_pay', 'paypal', 'klarna', 'link'],
+      payment_method_types: ['card', 'us_bank_account', 'amazon_pay', 'paypal', 'klarna', 'link'],
       setup_future_usage: 'off_session',
       payment_method_options: {
         card: {
