@@ -48,19 +48,35 @@ export default async (req: Request, _context: Context) => {
     });
 
     // 2. Create a PaymentIntent with the proven automatic_payment_methods flow.
-    //    setup_future_usage saves the payment method so the webhook can attach
-    //    it to a recurring subscription after this first payment succeeds.
+    //    setup_future_usage is set per-method (not top-level) so Stripe does not
+    //    filter out payment methods whose saving support it cannot verify upfront
+    //    (e.g. Venmo custom type, Klarna). Each method that supports saving gets
+    //    setup_future_usage individually; the rest still appear for first payment.
     const paymentIntent = await stripe.paymentIntents.create({
       amount: TOTAL,
       currency: 'usd',
       customer: customer.id,
       automatic_payment_methods: { enabled: true },
-      setup_future_usage: 'off_session',
       payment_method_options: {
+        card: {
+          setup_future_usage: 'off_session',
+        },
         us_bank_account: {
           setup_future_usage: 'off_session',
           transaction_purpose: 'services',
           verification_method: 'automatic',
+        },
+        cashapp: {
+          setup_future_usage: 'off_session',
+        },
+        paypal: {
+          setup_future_usage: 'off_session',
+        },
+        klarna: {
+          setup_future_usage: 'off_session',
+        },
+        link: {
+          setup_future_usage: 'off_session',
         },
       },
       metadata: {
