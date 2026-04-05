@@ -178,6 +178,18 @@ export default function StripePaymentForm({ onPaymentStateChange, formData }: Pr
             spacedAccordionItems: true,
             visibleAccordionItemsCount: 10,
           },
+          defaultValues: {
+            billingDetails: {
+              name: formData.owner_name,
+              email: formData.email,
+            },
+          },
+          fields: {
+            billingDetails: {
+              name: 'never',
+              email: 'never',
+            },
+          },
           business: { name: 'MatBoss' },
         }}
       />
@@ -210,8 +222,7 @@ export default function StripePaymentForm({ onPaymentStateChange, formData }: Pr
 
       <p className="mt-3 text-[11px] leading-relaxed text-gray-500">
         By clicking Authorize &amp; Pay $316, you authorize MatBoss to charge $316 today and save this
-        payment method for recurring $197 monthly billing until canceled. ACH bank debits can take up to
-        4 business days to confirm and may require additional bank verification.
+        payment method for recurring $197 monthly billing until canceled.
       </p>
     </form>
   );
