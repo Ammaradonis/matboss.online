@@ -37,6 +37,7 @@ function getPaymentMethodLabel(pm: Stripe.PaymentMethod | null | undefined): str
   }
 
   const typeLabels: Record<string, string> = {
+    venmo: 'Venmo',
     paypal: 'PayPal',
     klarna: 'Klarna',
     amazon_pay: 'Amazon Pay',

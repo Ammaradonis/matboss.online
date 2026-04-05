@@ -1,5 +1,10 @@
 import { useState } from 'react';
-import { useStripe, useElements, PaymentElement } from '@stripe/react-stripe-js';
+import { useStripe, useElements, PaymentElement, ExpressCheckoutElement } from '@stripe/react-stripe-js';
+import type {
+  StripeExpressCheckoutElementClickEvent,
+  StripeExpressCheckoutElementConfirmEvent,
+  StripeExpressCheckoutElementReadyEvent,
+} from '@stripe/stripe-js';
 
 interface Props {
   onPaymentStateChange: (state: 'processing' | 'succeeded') => void;
@@ -15,6 +20,64 @@ export default function StripePaymentForm({ onPaymentStateChange, formData }: Pr
   const elements = useElements();
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [expressPayAvailable, setExpressPayAvailable] = useState(false);
+
+  // ── Express Checkout (Apple Pay / Google Pay) ──
+
+  const handleExpressCheckoutReady = ({ availablePaymentMethods }: StripeExpressCheckoutElementReadyEvent) => {
+    setExpressPayAvailable(
+      !!availablePaymentMethods?.applePay || !!availablePaymentMethods?.googlePay
+    );
+  };
+
+  const handleExpressCheckoutClick = (event: StripeExpressCheckoutElementClickEvent) => {
+    event.resolve({
+      business: { name: 'MatBoss' },
+      lineItems: [
+        { name: 'MatBoss Enrollment Engine — First Month', amount: 19700 },
+        { name: 'Setup & Implementation', amount: 11900 },
+      ],
+    });
+  };
+
+  const handleExpressCheckoutConfirm = async (_event: StripeExpressCheckoutElementConfirmEvent) => {
+    if (!stripe || !elements) return;
+
+    setProcessing(true);
+    setError(null);
+
+    // Apple Pay / Google Pay provide their own billing details from the wallet,
+    // so we only pass return_url here. Customer metadata is already on the PaymentIntent.
+    const { error: confirmError, paymentIntent } = await stripe.confirmPayment({
+      elements,
+      confirmParams: {
+        return_url: `${window.location.origin}/pricing?payment_return=1`,
+      },
+      redirect: 'if_required',
+    });
+
+    if (confirmError) {
+      setError(confirmError.message || 'Payment failed. Please try again.');
+      setProcessing(false);
+    } else {
+      if (paymentIntent?.status === 'succeeded') {
+        onPaymentStateChange('succeeded');
+      } else if (paymentIntent?.status === 'processing') {
+        onPaymentStateChange('processing');
+      } else if (paymentIntent?.status === 'requires_payment_method') {
+        setError('Your payment method was not accepted. Please choose another one and try again.');
+        setProcessing(false);
+        return;
+      } else {
+        setError('Payment setup is incomplete. Please review the payment form and try again.');
+        setProcessing(false);
+        return;
+      }
+      setProcessing(false);
+    }
+  };
+
+  // ── Regular Payment Element Submit ──
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,6 +134,41 @@ export default function StripePaymentForm({ onPaymentStateChange, formData }: Pr
 
   return (
     <form onSubmit={handleSubmit}>
+      {/* Express Checkout — Apple Pay / Google Pay */}
+      <div className={expressPayAvailable ? 'mb-2' : ''}>
+        <ExpressCheckoutElement
+          options={{
+            buttonHeight: 48,
+            buttonType: {
+              applePay: 'buy',
+              googlePay: 'buy',
+            },
+            buttonTheme: {
+              applePay: 'white',
+              googlePay: 'white',
+            },
+            layout: {
+              maxColumns: 1,
+              maxRows: 2,
+            },
+          }}
+          onReady={handleExpressCheckoutReady}
+          onClick={handleExpressCheckoutClick}
+          onConfirm={handleExpressCheckoutConfirm}
+        />
+      </div>
+
+      {/* Divider between express and regular methods */}
+      {expressPayAvailable && (
+        <div className="flex items-center gap-3 my-5">
+          <div className="flex-1 h-px bg-white/10" />
+          <span className="text-xs text-gray-500 font-mono uppercase tracking-widest">
+            or pay with card / bank
+          </span>
+          <div className="flex-1 h-px bg-white/10" />
+        </div>
+      )}
+
       <PaymentElement
         options={{
           layout: 'tabs',
