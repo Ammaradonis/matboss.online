@@ -50,12 +50,15 @@ export default async (req: Request, _context: Context) => {
     // 2. Create a PaymentIntent with explicit payment_method_types so we control
     //    exactly which methods appear. Excludes customer_balance (bank transfer)
     //    and cashapp. Keeps card, ACH, Venmo, Amazon Pay, PayPal, Klarna, Link.
-    //    setup_future_usage is set per-method in payment_method_options below.
+    //    Top-level setup_future_usage saves every method (including Venmo and
+    //    Amazon Pay, which don't accept per-method payment_method_options).
+    //    Per-method overrides below take precedence where Stripe accepts them.
     const paymentIntent = await stripe.paymentIntents.create({
       amount: TOTAL,
       currency: 'usd',
       customer: customer.id,
       payment_method_types: ['card', 'us_bank_account', 'venmo', 'amazon_pay', 'paypal', 'klarna', 'link'],
+      setup_future_usage: 'off_session',
       payment_method_options: {
         card: {
           setup_future_usage: 'off_session',
@@ -64,12 +67,6 @@ export default async (req: Request, _context: Context) => {
           setup_future_usage: 'off_session',
           transaction_purpose: 'services',
           verification_method: 'automatic',
-        },
-        venmo: {
-          setup_future_usage: 'off_session',
-        },
-        amazon_pay: {
-          setup_future_usage: 'off_session',
         },
         paypal: {
           setup_future_usage: 'off_session',
