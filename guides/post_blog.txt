@@ -1,0 +1,13 @@
+How to Add a New Post (PowerShell)
+
+  node scripts/new-post.cjs --title "Your Post Title" --category market --date 2025-01-15
+
+  Categories: product, announcements, policy, company, social, market
+
+  The script automatically:
+  1. Generates slug and ID
+  2. Inserts the post at the top of src/data/posts.ts
+  3. Creates a placeholder thumbnail SVG
+  4. The post appears on /news immediately — no manual index editing
+
+  After running the script, edit src/data/posts.ts to fill in the post content (search for the post ID the script outputs).
