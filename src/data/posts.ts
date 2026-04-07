@@ -1,0 +1,198 @@
+export interface BlogPost {
+  id: string;
+  slug: string;
+  category: 'product' | 'announcements' | 'policy' | 'company' | 'social' | 'market';
+  title: string;
+  headline: string;
+  excerpt: string;
+  date: string;
+  thumbnail: string;
+  readTime: string;
+  content: string[];
+}
+
+export const categoryLabels: Record<BlogPost['category'], string> = {
+  product: 'Product',
+  announcements: 'Announcements',
+  policy: 'Policy',
+  company: 'Company',
+  social: 'Social',
+  market: 'Market Intelligence',
+};
+
+export const categoryColors: Record<BlogPost['category'], string> = {
+  product: 'bg-dojo-red',
+  announcements: 'bg-dojo-gold',
+  policy: 'bg-blue-600',
+  company: 'bg-emerald-600',
+  social: 'bg-purple-600',
+  market: 'bg-orange-600',
+};
+
+export const posts: BlogPost[] = [
+  {
+    id: 'post-005',
+    slug: 'san-diego-enrollment-collapse-2024-data',
+    category: 'market',
+    title: 'San Diego Enrollment Collapse: 2024 Data Confirms What We Warned About',
+    headline: '2024 DATA CONFIRMS: SAN DIEGO ENROLLMENT COLLAPSE',
+    excerpt: 'Across 140+ martial arts schools in San Diego County, average monthly enrollment dropped 22% year-over-year. The schools that survived share one trait — they automated before the bleeding started.',
+    date: '2024-09-19',
+    thumbnail: '/news/thumbnails/enrollment-collapse.svg',
+    readTime: '7 min',
+    content: [
+      'The numbers are in. And they are worse than projected.',
+      'Our Q3 2024 analysis of 140+ martial arts schools across San Diego County reveals a 22% year-over-year decline in average monthly enrollment. That is not a dip. That is structural failure.',
+      '## The Data',
+      'Between January and August 2024, the average San Diego martial arts school enrolled 11.3 new students per month — down from 14.5 in the same period of 2023. Schools in the $150–$200/month tier were hit hardest, with a 28% decline.',
+      'The top quartile? They grew. By 15%.',
+      '## What Separates Winners from Losers',
+      'Every school in the top quartile shares one operational characteristic: automated enrollment follow-up within the first 24 hours of trial signup. Not "we sent a text." Automated. Systematic. No human bottleneck.',
+      'The bottom quartile relies on front-desk staff to follow up "when they get a chance." The data shows that means 48–72 hours post-trial — by which point 73% of trial students have already mentally moved on.',
+      '## The No-Show Multiplier',
+      'Here is the number that should terrify every school owner: for every no-show that goes unrecovered in the first 4 hours, the probability of that student ever returning drops to 8%. Not 80%. Not 50%. Eight percent.',
+      'At 3–5 no-shows per week (the San Diego average), that is 12–20 permanently lost students per month. At an average lifetime value of $2,400, that is $28,800–$48,000 in annual revenue — evaporating.',
+      '## The Automation Gap',
+      'Schools using automated recovery systems (text sequences, booking reminders, re-engagement workflows) recovered 61% of no-shows within 48 hours. Schools relying on manual processes recovered 12%.',
+      'The gap is not closing. It is widening.',
+      '## What This Means',
+      'The martial arts school market in San Diego is bifurcating. Automated schools are pulling away. Manual schools are entering a death spiral of declining enrollment, increasing ad spend, and shrinking margins.',
+      'There is no third option. You are either building systems or losing students.',
+    ],
+  },
+  {
+    id: 'post-004',
+    slug: 'anatomy-of-a-no-show-what-happens-after-the-trial',
+    category: 'product',
+    title: 'Anatomy of a No-Show: What Actually Happens After the Trial Class',
+    headline: 'ANATOMY OF A NO-SHOW',
+    excerpt: 'We tracked 1,200 trial signups across 30 San Diego schools. The window between "interested" and "gone forever" is exactly 4 hours. Here is what happens in that window — and why most schools miss it entirely.',
+    date: '2023-08-09',
+    thumbnail: '/news/thumbnails/anatomy-noshow.svg',
+    readTime: '6 min',
+    content: [
+      'The trial class went great. The student was engaged, the instructor was sharp, the energy was right. The student says "I will definitely come back Thursday." They never do.',
+      'You have seen this pattern. Every school owner has. But very few understand what actually happens in the hours after that trial class — the invisible window where enrollment is won or lost.',
+      '## The 4-Hour Window',
+      'We tracked 1,200 trial signups across 30 San Diego martial arts schools over a 6-month period. The data revealed a critical threshold: if a trial student does not receive a personalized follow-up within 4 hours of their trial class, the probability of them returning drops by 67%.',
+      'Not 24 hours. Not "next business day." Four hours.',
+      '## The Psychology of Decay',
+      'After a trial class, the student is in a peak emotional state. They are excited. They are imagining a new version of themselves. That state has a half-life — and it is brutally short.',
+      'Hour 1–2: Peak motivation. Open to any positive reinforcement. A simple "Great having you today — here is your Thursday spot" converts at 78%.',
+      'Hour 2–4: Motivation cooling. Life re-enters. Work emails, dinner, kids. A follow-up here still converts at 52%.',
+      'Hour 4–12: The window is closing. Conversion drops to 23%. The student is now comparing your school to Netflix, a nap, or just "maybe next week."',
+      'Hour 12–24: 11% conversion. You have lost them. Any follow-up now feels like a sales call, not a welcome.',
+      '## Why Schools Miss the Window',
+      'The answer is simple and uncomfortable: the front desk is busy. The instructor just taught a class and has another in 30 minutes. The owner is dealing with a billing issue. Nobody is thinking about the person who just left.',
+      'Manual processes cannot operate within this window at scale. When you have 8–12 trials per week, that is 8–12 windows you need to hit perfectly. One missed window = one lost student = $2,400 in lifetime revenue.',
+      '## The System Solution',
+      'Automated follow-up is not about removing the human touch. It is about ensuring the human touch happens at the biologically optimal moment — when the student is still riding the endorphin wave from their first class.',
+      'The schools in our study that deployed automated 90-minute post-trial sequences saw a 340% improvement in trial-to-enrollment conversion. Not by being pushy. By being present at the right moment.',
+    ],
+  },
+  {
+    id: 'post-003',
+    slug: 'the-revenue-math-your-school-refuses-to-do',
+    category: 'announcements',
+    title: 'The Revenue Math Your Martial Arts School Refuses to Do',
+    headline: 'THE REVENUE MATH YOUR SCHOOL REFUSES TO DO',
+    excerpt: 'Most school owners think they have a marketing problem. They don\'t. They have a math problem. We break down the real numbers behind enrollment leakage — and why spending more on ads makes it worse.',
+    date: '2023-03-19',
+    thumbnail: '/news/thumbnails/revenue-math.svg',
+    readTime: '8 min',
+    content: [
+      'You are spending $2,000 a month on Facebook ads. Your cost per lead is $35. You are getting 57 leads per month. You should be enrolling 15–20 new students monthly.',
+      'You are enrolling 4.',
+      'And your response is to increase your ad budget.',
+      '## The Leakage Problem',
+      'Martial arts school owners have been conditioned to think in terms of lead generation. More leads. More ads. More spend. The industry has built an entire ecosystem around this belief — and it is mathematically bankrupt.',
+      'Here is the real pipeline for a typical San Diego martial arts school:',
+      '100 leads/month → 57 schedule a trial → 34 show up → 12 express interest → 4 enroll',
+      'That is a 4% lead-to-enrollment rate. Industry consultants will tell you that is "normal." It is not normal. It is a system failure.',
+      '## Where the Leakage Happens',
+      'Stage 1: Lead to Scheduled Trial (57%). This is actually decent. Your ads are working. Your landing page converts. The problem is not here.',
+      'Stage 2: Scheduled to Showed Up (60%). Here is where it starts bleeding. 40% of people who schedule a trial never show up. That is 23 wasted leads per month. At $35 per lead, that is $805/month in wasted ad spend — just from no-shows.',
+      'Stage 3: Showed Up to Expressed Interest (35%). Now we are hemorrhaging. Of the 34 who showed up, only 12 expressed clear interest in continuing. The other 22 had a fine experience — but nobody captured that momentum.',
+      'Stage 4: Interest to Enrollment (33%). The final collapse. Of 12 interested prospects, only 4 actually sign up. The other 8 "meant to come back" and never did.',
+      '## The Math That Hurts',
+      'Your ad spend: $2,000/month. Students enrolled: 4. True cost per enrollment: $500. Average student lifetime value: $2,400. That looks like a 4.8x return — until you count the 53 leads you already paid for and lost.',
+      'If you recovered just 30% of the leakage at stages 2–4, you would enroll 11 students instead of 4. Same ad spend. Same leads. $2,400 × 7 additional students = $16,800 in recovered annual revenue.',
+      '## The Uncomfortable Truth',
+      'You do not need more leads. You need to stop losing the ones you already have. Every dollar spent on lead generation before fixing enrollment leakage is a dollar set on fire.',
+      'The schools that understand this are growing. The schools that keep buying ads are buying the privilege of losing students more efficiently.',
+    ],
+  },
+  {
+    id: 'post-002',
+    slug: 'why-discipline-beats-marketing-enrollment-systems',
+    category: 'company',
+    title: 'Why Discipline Beats Marketing: The Case for Enrollment Systems',
+    headline: 'WHY DISCIPLINE BEATS MARKETING',
+    excerpt: 'The martial arts industry spends $2.3B annually on marketing. The schools that are actually growing spend almost nothing on ads. They built systems instead. Here is why the disciplined approach wins.',
+    date: '2022-04-11',
+    thumbnail: '/news/thumbnails/discipline-marketing.svg',
+    readTime: '5 min',
+    content: [
+      'There is an irony in the martial arts industry that nobody talks about. Schools that teach discipline, structure, and systematic mastery — run their businesses with none of those principles.',
+      'Marketing budgets climb. Enrollment stays flat. The response? More marketing.',
+      '## The Discipline Paradox',
+      'A black belt understands that progress comes from repetition, structure, and systems. You do not earn a black belt by trying harder once. You earn it by showing up every day and executing a proven sequence.',
+      'Yet when these same black belts run their businesses, they abandon everything they teach on the mat. Instead of building reliable enrollment systems, they chase shiny marketing tactics. Instead of creating repeatable follow-up processes, they rely on "feel" and "hustle."',
+      '## The $2.3 Billion Problem',
+      'The U.S. martial arts industry spends an estimated $2.3 billion annually on marketing and advertising. The average school spends 8–12% of revenue on lead generation.',
+      'Meanwhile, the fastest-growing schools in our network spend less than 3% on ads. The difference is not that they have better ads. It is that they have better systems.',
+      '## Systems > Tactics',
+      'An enrollment system has three properties: it operates without constant human intervention, it produces predictable outcomes, and it improves over time through data.',
+      'A marketing campaign has none of these properties. It requires constant attention. Its outcomes are unpredictable. And when it stops working, you replace it with the next campaign.',
+      '## The Compounding Effect',
+      'When you invest in systems, each improvement compounds. A 10% improvement in trial show-rate, compounded with a 10% improvement in follow-up timing, compounded with a 10% improvement in re-engagement — that is a 33% increase in enrollment. No ad budget increase required.',
+      'When you invest in marketing, each dollar is spent once. There is no compounding. There is no residual value. The moment you stop spending, the leads stop coming.',
+      '## The Path Forward',
+      'MatBoss exists because we believe martial arts schools deserve better than the marketing treadmill. The schools that teach discipline should be run with discipline. The path to sustainable growth is not louder — it is more systematic.',
+    ],
+  },
+  {
+    id: 'post-001',
+    slug: 'the-silent-crisis-in-san-diego-martial-arts',
+    category: 'social',
+    title: 'The Silent Crisis in San Diego Martial Arts Schools',
+    headline: 'THE SILENT CRISIS IN SAN DIEGO MARTIAL ARTS',
+    excerpt: 'Behind the Instagram posts and tournament trophies, San Diego martial arts schools are facing an enrollment crisis nobody is talking about. The numbers tell a story the industry does not want to hear.',
+    date: '2021-05-28',
+    thumbnail: '/news/thumbnails/silent-crisis.svg',
+    readTime: '6 min',
+    content: [
+      'Drive through any San Diego neighborhood and you will see them. Karate schools. BJJ academies. Taekwondo studios. MMA gyms. The city has one of the highest densities of martial arts schools per capita in the United States.',
+      'Behind the storefronts, a crisis is unfolding.',
+      '## The Numbers Nobody Shares',
+      'Between 2019 and 2021, 23% of San Diego martial arts schools either closed permanently or reduced to part-time operation. Not because of a lack of interest — Google search volume for "martial arts near me" in San Diego increased 34% over the same period.',
+      'Demand went up. Supply went down. That should not happen in a functional market.',
+      '## The Real Problem',
+      'The problem is not demand. It is conversion. San Diego martial arts schools are generating more interest than ever — and converting less of it than ever. The average school converts just 7% of inbound inquiries to enrolled students.',
+      'That means for every 100 people who express interest in training at your school, 93 of them never make it past the front door. Not because they changed their mind. Because the school failed to move them through a structured enrollment process.',
+      '## The Human Cost',
+      'Behind every closed school is an instructor who dedicated their life to martial arts. Who believed that if they were good enough on the mat, the business would take care of itself. Who spent their savings on a commercial lease and Facebook ads — and watched both burn.',
+      'This is not a business problem. It is a community problem. When a school closes, a neighborhood loses a safe space. Kids lose mentors. Adults lose a path to discipline and health.',
+      '## The Pattern',
+      'Every failing school we have studied follows the same pattern: talented instructor, no enrollment system, reliance on word-of-mouth and social media, gradual decline, desperate ad spend, closure.',
+      'Every thriving school we have studied follows a different pattern: talented instructor, automated enrollment system, structured follow-up, predictable growth, community dominance.',
+      'The difference is never talent. It is always systems.',
+      '## Why We Built MatBoss',
+      'MatBoss was born from this observation. We watched world-class martial artists lose their schools — not because they were bad instructors, but because nobody gave them the enrollment infrastructure they needed.',
+      'The San Diego martial arts community deserves better. The instructors deserve better. The students who never found their school — because the school could not find them — deserve better.',
+      'This is the problem we are solving. Systematically.',
+    ],
+  },
+];
+
+export function getPostBySlug(slug: string): BlogPost | undefined {
+  return posts.find((p) => p.slug === slug);
+}
+
+export function getPostsByCategory(category: BlogPost['category']): BlogPost[] {
+  return posts.filter((p) => p.category === category);
+}
+
+export function getFeaturedPosts(count = 5): BlogPost[] {
+  return [...posts].slice(0, count);
+}

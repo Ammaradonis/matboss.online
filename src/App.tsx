@@ -5,6 +5,8 @@ import BankTransferPage from './pages/BankTransferPage';
 import TermsOfServicePage from './pages/TermsOfServicePage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import DmarcPolicyPage from './pages/DmarcPolicyPage';
+import NewsPage from './pages/NewsPage';
+import BlogPostPage from './pages/BlogPostPage';
 
 export default function App() {
   return (
@@ -15,6 +17,8 @@ export default function App() {
       <Route path="/terms" element={<TermsOfServicePage />} />
       <Route path="/privacy" element={<PrivacyPolicyPage />} />
       <Route path="/dmarc" element={<DmarcPolicyPage />} />
+      <Route path="/news" element={<NewsPage />} />
+      <Route path="/news/:category/:slug" element={<BlogPostPage />} />
     </Routes>
   );
 }
