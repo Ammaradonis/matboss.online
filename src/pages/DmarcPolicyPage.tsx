@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import SEO from '../components/SEO';
 import Footer from '../components/Footer';
 
 export default function DmarcPolicyPage() {
@@ -9,6 +10,16 @@ export default function DmarcPolicyPage() {
 
   return (
     <div className="min-h-screen bg-dojo-black text-gray-300">
+      <SEO
+        title="DMARC Policy — MatBoss by Ammar Alkheder"
+        description="DMARC email authentication policy for MatBoss, the enrollment automation platform for San Diego martial arts schools. By Ammar Alkheder."
+        canonical="/dmarc"
+        noindex
+        breadcrumbs={[
+          { name: 'Home', url: '/' },
+          { name: 'DMARC Policy', url: '/dmarc' },
+        ]}
+      />
       <div className="max-w-4xl mx-auto px-4 py-16 md:py-24">
         {/* Back link */}
         <Link to="/" className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-white transition-colors mb-12">

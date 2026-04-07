@@ -18,8 +18,8 @@ export default function NewsAnnouncementBar() {
       setTimeout(() => {
         setIndex((i) => (i + 1) % messages.length);
         setFade(true);
-      }, 300);
-    }, 5000);
+      }, 400);
+    }, 7000);
     return () => clearInterval(interval);
   }, []);
 

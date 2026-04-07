@@ -1,0 +1,18 @@
+# MatBoss Official Website — https://matboss.online
+# Enrollment Automation for San Diego Martial Arts Schools
+# Founded by Ammar Alkheder
+
+User-agent: *
+Allow: /
+Allow: /pricing
+Allow: /news
+Allow: /news/
+Allow: /terms
+Allow: /privacy
+Allow: /dmarc
+
+# Sitemap
+Sitemap: https://matboss.online/sitemap.xml
+
+# Host
+Host: https://matboss.online

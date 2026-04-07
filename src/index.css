@@ -175,7 +175,7 @@
 
 .fomo-ticker-content {
   display: inline-block;
-  animation: tickerScroll 35s linear infinite;
+  animation: tickerScroll 75s linear infinite;
 }
 
 @keyframes tickerScroll {
@@ -296,7 +296,7 @@
   }
 
   .fomo-ticker-content {
-    animation-duration: 28s;
+    animation-duration: 60s;
   }
 }
 

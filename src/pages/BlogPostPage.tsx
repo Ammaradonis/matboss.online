@@ -1,5 +1,6 @@
 import { useParams, Link, Navigate } from 'react-router-dom';
 import { getPostBySlug, categoryLabels, categoryColors, posts } from '../data/posts';
+import SEO, { buildBlogPostSchema } from '../components/SEO';
 import Footer from '../components/Footer';
 
 export default function BlogPostPage() {
@@ -16,6 +17,24 @@ export default function BlogPostPage() {
 
   return (
     <div className="min-h-screen bg-dojo-black text-white">
+      <SEO
+        title={`${post.title} — MatBoss News`}
+        description={`${post.excerpt} By Ammar Alkheder, founder of MatBoss — San Diego martial arts enrollment automation.`}
+        canonical={`/news/${post.category}/${post.slug}`}
+        ogType="article"
+        ogImage={post.thumbnail.startsWith('http') ? post.thumbnail : `https://matboss.online${post.thumbnail}`}
+        article={{
+          publishedTime: post.date,
+          author: 'Ammar Alkheder',
+          section: categoryLabels[post.category],
+        }}
+        breadcrumbs={[
+          { name: 'Home', url: '/' },
+          { name: 'News', url: '/news' },
+          { name: post.title, url: `/news/${post.category}/${post.slug}` },
+        ]}
+        jsonLd={buildBlogPostSchema(post)}
+      />
       {/* Nav */}
       <nav className="border-b border-white/5 bg-dojo-black/95 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">

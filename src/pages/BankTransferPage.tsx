@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import SEO from '../components/SEO';
 import PricingAnnouncementBar from '../components/pricing/PricingAnnouncementBar';
 import PricingTicker from '../components/pricing/PricingTicker';
 import SectionClassified from '../components/pricing/SectionClassified';
@@ -33,6 +34,12 @@ export default function BankTransferPage() {
 
   return (
     <div className="min-h-screen bg-dojo-black dojo-mat-bg">
+      <SEO
+        title="Bank Transfer Payment — MatBoss San Diego"
+        description="Pay for MatBoss enrollment automation via bank transfer. Built for San Diego martial arts schools by Ammar Alkheder."
+        canonical="/bank-transfer"
+        noindex
+      />
       <PricingAnnouncementBar />
       <PricingTicker />
       <SectionClassified />

@@ -26,7 +26,7 @@ export default {
         'float': 'float 6s ease-in-out infinite',
         'strike': 'strike 2s ease-out infinite',
         'belt-flow': 'beltFlow 8s linear infinite',
-        'ticker': 'ticker 30s linear infinite',
+        'ticker': 'ticker 70s linear infinite',
         'fade-in': 'fadeIn 0.8s ease-out forwards',
         'slide-up': 'slideUp 0.6s ease-out forwards',
         'glow': 'glow 2s ease-in-out infinite alternate',
