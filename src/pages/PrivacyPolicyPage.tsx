@@ -11,13 +11,39 @@ export default function PrivacyPolicyPage() {
   return (
     <div className="min-h-screen bg-dojo-black text-gray-300">
       <SEO
-        title="Privacy Policy — MatBoss by Ammar Alkheder"
-        description="Privacy Policy for MatBoss, the enrollment automation platform for San Diego martial arts schools. CCPA/CPRA compliant. By Ammar Alkheder."
+        title="Privacy Policy | MatBoss Official Website — CCPA & GDPR Compliant"
+        description="MatBoss Official Website Privacy Policy by Ammar Alkheder. Fully CCPA/CPRA and GDPR compliant data practices for the San Diego martial arts enrollment automation platform. Learn how MatBoss collects, uses, stores, and protects personal data for martial arts school owners, BJJ academies, karate dojos, and MMA gym operators across San Diego, CA."
         canonical="/privacy"
         breadcrumbs={[
           { name: 'Home', url: '/' },
           { name: 'Privacy Policy', url: '/privacy' },
         ]}
+        jsonLd={{
+          '@context': 'https://schema.org',
+          '@type': 'WebPage',
+          '@id': 'https://matboss.online/privacy',
+          name: 'Privacy Policy | MatBoss Official Website',
+          description: 'CCPA/CPRA and GDPR compliant Privacy Policy for MatBoss, the enrollment automation platform for San Diego martial arts schools by Ammar Alkheder.',
+          url: 'https://matboss.online/privacy',
+          inLanguage: 'en-US',
+          isPartOf: { '@id': 'https://matboss.online/#website' },
+          about: { '@id': 'https://matboss.online/#organization' },
+          breadcrumb: {
+            '@type': 'BreadcrumbList',
+            itemListElement: [
+              { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://matboss.online' },
+              { '@type': 'ListItem', position: 2, name: 'Privacy Policy', item: 'https://matboss.online/privacy' },
+            ],
+          },
+          dateModified: '2026-04-01',
+          publisher: { '@id': 'https://matboss.online/#organization' },
+          author: { '@id': 'https://matboss.online/#founder' },
+          keywords: 'MatBoss privacy policy, MatBoss Official Website data privacy, Ammar Alkheder privacy, CCPA CPRA GDPR martial arts software, San Diego martial arts school data protection, enrollment platform privacy',
+          speakable: {
+            '@type': 'SpeakableSpecification',
+            cssSelector: ['h1', 'h2'],
+          },
+        }}
       />
       <div className="max-w-4xl mx-auto px-4 py-16 md:py-24">
         {/* Back link */}
@@ -362,7 +388,6 @@ export default function PrivacyPolicyPage() {
             <p className="mb-3">If you have questions, concerns, or requests regarding this Privacy Policy or our data practices, please contact us using the following methods:</p>
             <div className="p-4 rounded-lg bg-dojo-carbon/50 border border-white/5 text-gray-400 space-y-1 mb-4">
               <p>Email: <a href="mailto:privacy@matboss.online" className="text-dojo-red hover:underline">privacy@matboss.online</a></p>
-              <p>Mailing Address: Ammar Alkheder, Attn: Privacy Officer, San Diego, CA 92101</p>
             </div>
             <p className="mb-3">
               <strong className="text-white">Response Times:</strong> We aim to respond to all privacy-related inquiries within ten (10) business days. Requests submitted under the CCPA/CPRA will be acknowledged within ten (10) business days and substantively responded to within forty-five (45) calendar days.

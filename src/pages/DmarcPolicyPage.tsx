@@ -11,14 +11,35 @@ export default function DmarcPolicyPage() {
   return (
     <div className="min-h-screen bg-dojo-black text-gray-300">
       <SEO
-        title="DMARC Policy — MatBoss by Ammar Alkheder"
-        description="DMARC email authentication policy for MatBoss, the enrollment automation platform for San Diego martial arts schools. By Ammar Alkheder."
+        title="DMARC Email Authentication Policy | MatBoss Official Website"
+        description="Official DMARC, SPF, and DKIM email authentication policy for MatBoss Official Website (matboss.online) by Ammar Alkheder. Guarantees all emails from the MatBoss enrollment automation platform for San Diego martial arts schools, BJJ academies, and dojos are authenticated, legitimate, and protected against phishing and spoofing."
         canonical="/dmarc"
-        noindex
         breadcrumbs={[
           { name: 'Home', url: '/' },
           { name: 'DMARC Policy', url: '/dmarc' },
         ]}
+        jsonLd={{
+          '@context': 'https://schema.org',
+          '@type': 'WebPage',
+          '@id': 'https://matboss.online/dmarc',
+          name: 'DMARC Email Authentication Policy | MatBoss Official Website',
+          description: 'DMARC, SPF, and DKIM email authentication policy for MatBoss Official Website by Ammar Alkheder. Protecting San Diego martial arts school communications.',
+          url: 'https://matboss.online/dmarc',
+          inLanguage: 'en-US',
+          isPartOf: { '@id': 'https://matboss.online/#website' },
+          about: { '@id': 'https://matboss.online/#organization' },
+          breadcrumb: {
+            '@type': 'BreadcrumbList',
+            itemListElement: [
+              { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://matboss.online' },
+              { '@type': 'ListItem', position: 2, name: 'DMARC Policy', item: 'https://matboss.online/dmarc' },
+            ],
+          },
+          dateModified: '2026-04-01',
+          publisher: { '@id': 'https://matboss.online/#organization' },
+          author: { '@id': 'https://matboss.online/#founder' },
+          keywords: 'MatBoss DMARC policy, MatBoss Official Website email authentication, matboss.online SPF DKIM, Ammar Alkheder email security, San Diego martial arts platform email policy, anti-phishing martial arts software',
+        }}
       />
       <div className="max-w-4xl mx-auto px-4 py-16 md:py-24">
         {/* Back link */}
@@ -210,7 +231,6 @@ export default function DmarcPolicyPage() {
             <div className="p-4 rounded-lg bg-dojo-carbon/50 border border-white/5 text-gray-400 space-y-1 mb-4">
               <p>Security Inquiries: <a href="mailto:security@matboss.online" className="text-dojo-red hover:underline">security@matboss.online</a></p>
               <p>General Inquiries: <a href="mailto:info@matboss.online" className="text-dojo-red hover:underline">info@matboss.online</a></p>
-              <p>Mailing Address: Ammar Alkheder, Attn: Security, San Diego, CA 92101</p>
             </div>
             <p>
               For urgent security concerns, including active phishing campaigns targeting the matboss.online domain, please email <a href="mailto:security@matboss.online" className="text-dojo-red hover:underline">security@matboss.online</a> with the subject line "URGENT: Phishing Report" and include any relevant message headers or screenshots.

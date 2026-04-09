@@ -11,13 +11,35 @@ export default function TermsOfServicePage() {
   return (
     <div className="min-h-screen bg-dojo-black text-gray-300">
       <SEO
-        title="Terms of Service — MatBoss by Ammar Alkheder"
-        description="Terms of Service for MatBoss, the enrollment automation platform for San Diego martial arts schools. By Ammar Alkheder. Effective April 1, 2026."
+        title="Terms of Service | MatBoss Official Website — Ammar Alkheder"
+        description="Official Terms of Service for MatBoss Official Website — the #1 enrollment automation platform for San Diego martial arts schools, BJJ academies, karate dojos, and MMA gyms. Founded by Ammar Alkheder. Understand your rights, usage policies, service agreements, and legal obligations when using MatBoss enrollment automation software."
         canonical="/terms"
         breadcrumbs={[
           { name: 'Home', url: '/' },
           { name: 'Terms of Service', url: '/terms' },
         ]}
+        jsonLd={{
+          '@context': 'https://schema.org',
+          '@type': 'WebPage',
+          '@id': 'https://matboss.online/terms',
+          name: 'Terms of Service | MatBoss Official Website',
+          description: 'Official Terms of Service for MatBoss, the enrollment automation platform for San Diego martial arts schools by Ammar Alkheder.',
+          url: 'https://matboss.online/terms',
+          inLanguage: 'en-US',
+          isPartOf: { '@id': 'https://matboss.online/#website' },
+          about: { '@id': 'https://matboss.online/#organization' },
+          breadcrumb: {
+            '@type': 'BreadcrumbList',
+            itemListElement: [
+              { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://matboss.online' },
+              { '@type': 'ListItem', position: 2, name: 'Terms of Service', item: 'https://matboss.online/terms' },
+            ],
+          },
+          dateModified: '2026-04-01',
+          publisher: { '@id': 'https://matboss.online/#organization' },
+          author: { '@id': 'https://matboss.online/#founder' },
+          keywords: 'MatBoss terms of service, MatBoss Official Website legal, Ammar Alkheder MatBoss terms, San Diego martial arts enrollment platform terms, martial arts software terms of use',
+        }}
       />
       <div className="max-w-4xl mx-auto px-4 py-16 md:py-24">
         {/* Back link */}
