@@ -75,9 +75,18 @@ export default function Footer() {
 
         {/* Bottom */}
         <div className="flex flex-col items-center justify-between gap-4 border-t border-white/5 pt-4 text-center md:flex-row md:text-left">
-          <p className="text-[10px] text-gray-600">
-            &copy; {year} MatBoss - Stop the Leaks. All rights reserved. San Diego, CA.
-          </p>
+          <div className="text-[10px] text-gray-600">
+            <p>&copy; {year} Ammar Alkheder. All rights reserved. San Diego, CA.</p>
+            <p>Austrian Sole Proprietor Operating under MatBoss Brand. Austrian Business Register: Gewerbeinformationssystem Austria - GISA. Registration Number: 39216625</p>
+            <a
+              href="https://www.gisa.gv.at/fshost-gisa-p/user/formular.aspx?pid=3e8b81d122df415db65b1ec312d5a452&pn=Be2102a48c44b427fa29b85296c7f6b3f#scrollid1"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-2 inline-block rounded border border-gray-600 px-3 py-1 text-[10px] text-gray-400 transition-colors hover:border-white hover:text-white"
+            >
+              Verify Legal Status NOW
+            </a>
+          </div>
           <div className="flex flex-wrap items-center justify-center gap-4">
             <Link to="/terms" className="text-[10px] text-gray-600 hover:text-white transition-colors">
               Terms of Service
