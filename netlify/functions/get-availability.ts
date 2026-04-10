@@ -1,6 +1,6 @@
 import type { Context } from '@netlify/functions';
-import pool from './db';
 import { filterBookableSlots } from '../../src/lib/bookingRules';
+import { generateSlotsForMonth } from './slotGenerator';
 
 export default async (req: Request, _context: Context) => {
   const url = new URL(req.url);
@@ -15,21 +15,9 @@ export default async (req: Request, _context: Context) => {
   }
 
   try {
-    const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
-    const endDate = month === 12
-      ? `${year + 1}-01-01`
-      : `${year}-${String(month + 1).padStart(2, '0')}-01`;
-
-    const result = await pool.query(
-      `SELECT id, slot_date::text, start_time::text, end_time::text, is_booked
-       FROM availability
-       WHERE slot_date >= $1 AND slot_date < $2
-       ORDER BY slot_date, start_time`,
-      [startDate, endDate]
-    );
-
+    const slots = generateSlotsForMonth(year, month);
     return new Response(
-      JSON.stringify({ slots: filterBookableSlots(result.rows) }),
+      JSON.stringify({ slots: filterBookableSlots(slots) }),
       {
         status: 200,
         headers: {
@@ -39,9 +27,9 @@ export default async (req: Request, _context: Context) => {
       }
     );
   } catch (err: any) {
-    console.error('DB error fetching availability:', err.message);
+    console.error('Error generating availability:', err?.message || err);
     return new Response(
-      JSON.stringify({ error: 'Failed to fetch availability' }),
+      JSON.stringify({ error: 'Failed to generate availability' }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }
