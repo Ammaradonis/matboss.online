@@ -131,6 +131,12 @@ export async function bookSlot(
     });
 
     if (!res.ok) {
+      // Server errors (5xx): backend is unreachable — use local fallback
+      if (res.status >= 500) {
+        throw new TypeError('Backend unavailable');
+      }
+
+      // Client/business errors (4xx): surface the specific message
       let errorMessage = 'Booking failed. Please try again.';
 
       try {

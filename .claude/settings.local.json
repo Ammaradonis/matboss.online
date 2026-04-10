@@ -14,7 +14,17 @@
       "Bash(mkdir -p /c/Users/FingerWeg/CascadeProjects/matboss.online/src/data)",
       "Bash(mkdir -p /c/Users/FingerWeg/CascadeProjects/matboss.online/src/components/news)",
       "Bash(npx vite:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(psql:*)",
+      "Bash(where psql:*)",
+      "Read(//c/Program Files/PostgreSQL/**)",
+      "Read(//c/Program Files \\(x86\\)/**)",
+      "Bash(PGPASSWORD=946732 /c/Program Files/PostgreSQL/18/bin/psql.exe:*)",
+      "Bash(sc query:*)",
+      "Bash(net start:*)",
+      "Bash(powershell -Command \"Get-Service *postgres*\")",
+      "Bash(powershell:*)",
+      "Bash(/c/Program Files/PostgreSQL/18/bin/pg_ctl.exe:*)"
     ]
   }
 }
