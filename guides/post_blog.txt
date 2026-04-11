@@ -1,13 +1,73 @@
-How to Add a New Post (PowerShell)
+How to Post to the Blog
+
+node scripts/new-post.cjs --title "MatBoss vs GymMaster: Which System Actually Increases Martial Arts Enrollments?" --category market --date 2024-12-19
+
+
+
+Automated route for Make.com
+
+  1. Rotate the ingestion key:
+
+     powershell -ExecutionPolicy Bypass -File .\scripts\rotate-news-api-key.ps1 -IssuedTo "Make.com"
+
+  2. Copy the printed raw key into the Make.com HTTP module header:
+
+     x-api-key: <printed key>
+
+  3. Send JSON to:
+
+     POST https://matboss.online/api/news-posts
+
+  4. Required JSON fields:
+
+     id, slug, category, title, headline, excerpt, date, thumbnailUrl, readTime, content
+
+  5. Allowed categories:
+
+     product, announcements, policy, company, social, market
+
+Notes
+
+  - thumbnailUrl accepts either a full URL (https://...) or a local site path (/news/thumbnails/example.svg).
+  - content can be an array of strings. A plain string is also accepted and split into paragraphs.
+  - Posts are stored in the blog database and merged with the existing static seed posts on /news.
+
+Manual fallback for local seed content
 
   node scripts/new-post.cjs --title "Your Post Title" --category market --date 2025-01-15
 
-  Categories: product, announcements, policy, company, social, market
-
-  The script automatically:
+  The local script still:
   1. Generates slug and ID
   2. Inserts the post at the top of src/data/posts.ts
   3. Creates a placeholder thumbnail SVG
-  4. The post appears on /news immediately — no manual index editing
 
-  After running the script, edit src/data/posts.ts to fill in the post content (search for the post ID the script outputs).
+
+The /news architecture was static before: the index and article pages read directly from src/data/posts.ts. I added a
+  Netlify-backed news API so Make.com can post new articles into Postgres, while the existing static posts remain as
+  fallback seed content.
+
+  The backend endpoint is in /C:/Users/FingerWeg/CascadeProjects/matboss.online/netlify/functions/news-posts.ts:345. It
+  now:
+
+  - accepts POST /api/news-posts
+  - requires x-api-key or Authorization: Bearer ...
+  - validates id, slug, category, title, headline, excerpt, date, thumbnailUrl, readTime, content
+  - accepts thumbnailUrl as either a full https://... URL or a local /news/... path
+  - upserts into a new blog_posts table
+
+  The DB schema is in /C:/Users/FingerWeg/CascadeProjects/matboss.online/sql/migration.sql:67. The frontend now loads
+  runtime posts through /C:/Users/FingerWeg/CascadeProjects/matboss.online/src/hooks/useBlogPosts.ts:10, used by /C:/
+  Users/FingerWeg/CascadeProjects/matboss.online/src/pages/NewsPage.tsx:13 and /C:/Users/FingerWeg/CascadeProjects/
+
+  Key Rotation
+
+  I added a PowerShell rotation command in /C:/Users/FingerWeg/CascadeProjects/matboss.online/scripts/rotate-news-api-
+  key.ps1:1. Run:
+
+  That updates BLOG_INGEST_API_KEY_HASH in your env file and prints the one-time raw key for Make.com. I also updated
+  the workflow notes in /C:/Users/FingerWeg/CascadeProjects/matboss.online/guides/post_blog.txt:3.
+
+  Verified / Note
+
+  I verified with npm run build, a direct TypeScript compile of the new Netlify function, and a smoke test of the
+  PowerShell rotation script.

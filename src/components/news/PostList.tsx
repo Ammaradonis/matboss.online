@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
-import { posts, categoryLabels, categoryColors, type BlogPost } from '../../data/posts';
+import { categoryLabels, categoryColors, type BlogPost } from '../../data/posts';
 
-export default function PostList() {
+export default function PostList({ posts }: { posts: BlogPost[] }) {
   return (
     <section id="posts" className="max-w-7xl mx-auto px-4 sm:px-6 py-12">
       {/* Section header */}

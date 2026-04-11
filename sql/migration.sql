@@ -61,3 +61,29 @@ CREATE INDEX IF NOT EXISTS idx_bookings_email
 
 CREATE INDEX IF NOT EXISTS idx_bookings_created
     ON bookings (created_at DESC);
+
+
+-- ============================================
+-- BLOG POSTS TABLE
+-- Stores Make.com-ingested and manually managed news posts
+-- ============================================
+CREATE TABLE IF NOT EXISTS blog_posts (
+    id              VARCHAR(120) PRIMARY KEY,
+    slug            VARCHAR(255) NOT NULL UNIQUE,
+    category        VARCHAR(50) NOT NULL,
+    title           VARCHAR(255) NOT NULL,
+    headline        VARCHAR(255) NOT NULL,
+    excerpt         TEXT NOT NULL,
+    published_date  DATE NOT NULL,
+    thumbnail_url   TEXT NOT NULL,
+    read_time       VARCHAR(32) NOT NULL,
+    content         JSONB NOT NULL DEFAULT '[]'::jsonb,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_blog_posts_published_date
+    ON blog_posts (published_date DESC);
+
+CREATE INDEX IF NOT EXISTS idx_blog_posts_category_published_date
+    ON blog_posts (category, published_date DESC);

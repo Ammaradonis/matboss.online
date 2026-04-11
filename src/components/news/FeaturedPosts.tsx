@@ -1,9 +1,13 @@
 import { Link } from 'react-router-dom';
-import { getFeaturedPosts, categoryLabels, categoryColors } from '../../data/posts';
+import { getFeaturedPosts, categoryLabels, categoryColors, type BlogPost } from '../../data/posts';
 
-export default function FeaturedPosts() {
-  const featured = getFeaturedPosts(5);
+export default function FeaturedPosts({ posts }: { posts: BlogPost[] }) {
+  const featured = getFeaturedPosts(5, posts);
   const [lead, ...rest] = featured;
+
+  if (!lead) {
+    return null;
+  }
 
   return (
     <section className="max-w-7xl mx-auto px-4 sm:px-6 py-12">

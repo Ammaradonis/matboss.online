@@ -1,11 +1,48 @@
 import { useParams, Link, Navigate } from 'react-router-dom';
-import { getPostBySlug, categoryLabels, categoryColors, posts } from '../data/posts';
+import { getPostBySlugFrom, categoryLabels, categoryColors } from '../data/posts';
 import SEO, { buildBlogPostSchema } from '../components/SEO';
 import Footer from '../components/Footer';
+import useBlogPosts from '../hooks/useBlogPosts';
 
 export default function BlogPostPage() {
   const { slug } = useParams<{ slug: string }>();
-  const post = slug ? getPostBySlug(slug) : undefined;
+  const { posts, loading } = useBlogPosts();
+  const post = slug ? getPostBySlugFrom(posts, slug) : undefined;
+
+  if (!slug) {
+    return <Navigate to="/news" replace />;
+  }
+
+  if (!post && loading) {
+    return (
+      <div className="min-h-screen bg-dojo-black text-white">
+        <nav className="border-b border-white/5 bg-dojo-black/95 backdrop-blur-sm sticky top-0 z-50">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
+            <Link to="/" className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded bg-dojo-red flex items-center justify-center">
+                <span className="font-heading text-white text-xs">M</span>
+              </div>
+              <span className="font-heading text-base tracking-wider text-white">MatBoss</span>
+            </Link>
+            <Link
+              to="/news"
+              className="text-[11px] font-mono text-gray-500 hover:text-white tracking-wider uppercase transition-colors"
+            >
+              &larr; All Posts
+            </Link>
+          </div>
+        </nav>
+
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-24">
+          <p className="text-[11px] font-mono tracking-[0.25em] uppercase text-gray-600">
+            Loading article
+          </p>
+        </div>
+
+        <Footer />
+      </div>
+    );
+  }
 
   if (!post) {
     return <Navigate to="/news" replace />;
@@ -23,6 +60,7 @@ export default function BlogPostPage() {
         canonical={`/news/${post.category}/${post.slug}`}
         ogType="article"
         ogImage={post.thumbnail.startsWith('http') ? post.thumbnail : `https://matboss.online${post.thumbnail}`}
+        rssFeedUrl="/rss.xml"
         article={{
           publishedTime: post.date,
           author: 'Ammar Alkheder',

@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import SEO from '../components/SEO';
+import SEO, { buildBlogIndexSchema } from '../components/SEO';
 import NewsAnnouncementBar from '../components/news/NewsAnnouncementBar';
 import NewsTicker from '../components/news/NewsTicker';
 import NotificationRail from '../components/news/NotificationRail';
@@ -8,8 +8,11 @@ import FeaturedPosts from '../components/news/FeaturedPosts';
 import PostList from '../components/news/PostList';
 import RevenueLeakageSVG from '../components/news/RevenueLeakageSVG';
 import Footer from '../components/Footer';
+import useBlogPosts from '../hooks/useBlogPosts';
 
 export default function NewsPage() {
+  const { posts } = useBlogPosts();
+
   return (
     <div className="min-h-screen bg-dojo-black text-white">
       <SEO
@@ -20,17 +23,8 @@ export default function NewsPage() {
           { name: 'Home', url: '/' },
           { name: 'News', url: '/news' },
         ]}
-        jsonLd={{
-          '@context': 'https://schema.org',
-          '@type': 'Blog',
-          '@id': 'https://matboss.online/news',
-          name: 'MatBoss News — San Diego Martial Arts Enrollment Intelligence',
-          description: 'Market intelligence and enrollment automation insights for San Diego martial arts schools by Ammar Alkheder.',
-          url: 'https://matboss.online/news',
-          publisher: { '@id': 'https://matboss.online/#organization' },
-          author: { '@id': 'https://matboss.online/#founder' },
-          inLanguage: 'en-US',
-        }}
+        rssFeedUrl="/rss.xml"
+        jsonLd={buildBlogIndexSchema(posts)}
       />
       {/* Announcement Bar */}
       <NewsAnnouncementBar />
@@ -81,7 +75,7 @@ export default function NewsPage() {
       <div className="section-divider" />
 
       {/* Featured Posts */}
-      <FeaturedPosts />
+      <FeaturedPosts posts={posts} />
 
       {/* Revenue Leakage Diagram — between sections */}
       <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
@@ -92,7 +86,7 @@ export default function NewsPage() {
       <div className="section-divider" />
 
       {/* All Posts Table */}
-      <PostList />
+      <PostList posts={posts} />
 
       {/* Footer */}
       <Footer />

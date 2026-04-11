@@ -30,6 +30,7 @@ export const categoryColors: Record<BlogPost['category'], string> = {
 };
 
 export const posts: BlogPost[] = [
+
   {
     id: 'post-007',
     slug: 'matboss-official-website-vs-mindbody-which-actually-drives-enrollments-for-san-d',

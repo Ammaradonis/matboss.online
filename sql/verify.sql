@@ -25,3 +25,12 @@ FROM availability
 WHERE slot_date >= CURRENT_DATE
 GROUP BY EXTRACT(DOW FROM slot_date)
 ORDER BY EXTRACT(DOW FROM slot_date);
+
+-- Confirm blog post table exists and inspect recent entries
+SELECT COUNT(*) AS total_blog_posts
+FROM blog_posts;
+
+SELECT id, slug, category, published_date, updated_at
+FROM blog_posts
+ORDER BY published_date DESC, updated_at DESC
+LIMIT 10;

@@ -1,7 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import SEO from '../components/SEO';
 import Footer from '../components/Footer';
+import NoShowRecoveryEngine from '../components/demos/NoShowRecoveryEngine';
+import EnrollmentLeakCalculator from '../components/demos/EnrollmentLeakCalculator';
+import TrialConversionSequence from '../components/demos/TrialConversionSequence';
+import LiveBookingBot from '../components/demos/LiveBookingBot';
+import AdminHoursSavedDashboard from '../components/demos/AdminHoursSavedDashboard';
+import CompetitiveGapAudit from '../components/demos/CompetitiveGapAudit';
 
 const PROGRAMS = [
   'Brazilian Jiu-Jitsu (BJJ)',
@@ -12,6 +18,72 @@ const PROGRAMS = [
   'Wrestling',
   'Kids Martial Arts',
 ];
+
+const TRIAL_TIMES = (() => {
+  const slots: { value: string; label: string }[] = [];
+  for (let h = 6; h <= 23; h++) {
+    for (const m of [0, 30]) {
+      const value = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+      const period = h >= 12 ? 'PM' : 'AM';
+      const hour12 = h % 12 === 0 ? 12 : h % 12;
+      const label = `${hour12}:${String(m).padStart(2, '0')} ${period}`;
+      slots.push({ value, label });
+    }
+  }
+  return slots;
+})();
+
+const SAN_DIEGO_TZ = 'America/Los_Angeles';
+const MIN_LEAD_HOURS = 25;
+
+function getSanDiegoOffset(dateStr: string, timeStr: string) {
+  const approxMoment = new Date(`${dateStr}T${timeStr}:00Z`);
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: SAN_DIEGO_TZ,
+    timeZoneName: 'longOffset',
+  }).formatToParts(approxMoment);
+  const raw = parts.find(p => p.type === 'timeZoneName')?.value ?? 'GMT-08:00';
+  const offset = raw.replace('GMT', '');
+  return offset || '-08:00';
+}
+
+function buildMakeTimestamp(dateStr: string, timeStr: string) {
+  return `${dateStr}T${timeStr}:00${getSanDiegoOffset(dateStr, timeStr)}`;
+}
+
+function buildHumanDateTime(dateStr: string, timeStr: string) {
+  const [y, mo, d] = dateStr.split('-').map(Number);
+  const [h, mi] = timeStr.split(':').map(Number);
+  const datePart = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'UTC',
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(new Date(Date.UTC(y, mo - 1, d)));
+  const period = h >= 12 ? 'PM' : 'AM';
+  const hour12 = h % 12 === 0 ? 12 : h % 12;
+  const timePart = mi === 0 ? `${hour12} ${period}` : `${hour12}:${String(mi).padStart(2, '0')} ${period}`;
+  return `${datePart} at ${timePart}`;
+}
+
+function getSanDiegoMinimum() {
+  const target = new Date(Date.now() + MIN_LEAD_HOURS * 60 * 60 * 1000);
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: SAN_DIEGO_TZ,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(target);
+  const get = (t: string) => parts.find(p => p.type === t)?.value ?? '';
+  return {
+    minDate: `${get('year')}-${get('month')}-${get('day')}`,
+    minTime: `${get('hour')}:${get('minute')}`,
+  };
+}
 
 type Status = 'idle' | 'submitting' | 'success' | 'error';
 
@@ -26,9 +98,30 @@ export default function DemoPage() {
     email: '',
     phone: '',
     program: '',
+    trial_date: '',
+    trial_time: '',
   });
   const [status, setStatus] = useState<Status>('idle');
   const [errorMsg, setErrorMsg] = useState('');
+
+  const { minDate, minTime } = useMemo(getSanDiegoMinimum, []);
+
+  const availableTimes = useMemo(() => {
+    if (form.trial_date && form.trial_date === minDate) {
+      return TRIAL_TIMES.filter(t => t.value >= minTime);
+    }
+    return TRIAL_TIMES;
+  }, [form.trial_date, minDate, minTime]);
+
+  useEffect(() => {
+    if (
+      form.trial_date === minDate &&
+      form.trial_time &&
+      form.trial_time < minTime
+    ) {
+      setForm(prev => ({ ...prev, trial_time: '' }));
+    }
+  }, [form.trial_date, form.trial_time, minDate, minTime]);
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
     setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
@@ -36,6 +129,16 @@ export default function DemoPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
+    if (
+      form.trial_date < minDate ||
+      (form.trial_date === minDate && form.trial_time < minTime)
+    ) {
+      setStatus('error');
+      setErrorMsg('Trial must be booked at least 25 hours in advance (San Diego time).');
+      return;
+    }
+
     setStatus('submitting');
     setErrorMsg('');
 
@@ -47,6 +150,10 @@ export default function DemoPage() {
       email: form.email,
       phone: form.phone,
       program: form.program,
+      trial_date: form.trial_date,
+      trial_time: form.trial_time,
+      Make_timestamp: buildMakeTimestamp(form.trial_date, form.trial_time),
+      'date-time': buildHumanDateTime(form.trial_date, form.trial_time),
     };
 
     try {
@@ -102,7 +209,7 @@ export default function DemoPage() {
         }}
       />
 
-      <div className="max-w-lg mx-auto px-4 py-16 md:py-24">
+      <div className="max-w-lg mx-auto px-4 pt-16 md:pt-24 pb-8">
         <Link to="/" className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-white transition-colors mb-12">
           &larr; Back to Home
         </Link>
@@ -224,6 +331,43 @@ export default function DemoPage() {
               </select>
             </div>
 
+            <div>
+              <label htmlFor="trial_date" className={labelClass}>Trial Date</label>
+              <input
+                id="trial_date"
+                name="trial_date"
+                type="date"
+                required
+                min={minDate}
+                value={form.trial_date}
+                onChange={handleChange}
+                className={inputClass}
+              />
+              <p className="mt-1 text-[11px] text-gray-600">
+                Trials must be scheduled at least 25 hours ahead (San Diego time).
+              </p>
+            </div>
+
+            <div>
+              <label htmlFor="trial_time" className={labelClass}>Trial Time</label>
+              <select
+                id="trial_time"
+                name="trial_time"
+                required
+                disabled={!form.trial_date}
+                value={form.trial_time}
+                onChange={handleChange}
+                className={inputClass}
+              >
+                <option value="" disabled>
+                  {form.trial_date ? 'Select a start time' : 'Pick a trial date first'}
+                </option>
+                {availableTimes.map(t => (
+                  <option key={t.value} value={t.value}>{t.label}</option>
+                ))}
+              </select>
+            </div>
+
             {status === 'error' && (
               <p className="text-dojo-red text-sm">{errorMsg}</p>
             )}
@@ -239,7 +383,110 @@ export default function DemoPage() {
         )}
       </div>
 
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* LIVE DEMO SHOWCASE — 6 interactive demos below the form */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      <DemoShowcaseIntro />
+
+      <div className="max-w-6xl mx-auto px-4 pb-24">
+        <NoShowRecoveryEngine />
+        <EnrollmentLeakCalculator />
+        <TrialConversionSequence />
+        <LiveBookingBot />
+        <AdminHoursSavedDashboard />
+        <CompetitiveGapAudit />
+
+        {/* Final CTA back to the form */}
+        <div className="my-24 text-center">
+          <div className="inline-block px-6 py-3 rounded-full border border-dojo-red/30 bg-dojo-red/5 mb-6">
+            <span className="text-[10px] font-mono text-dojo-red uppercase tracking-[0.3em]">
+              ◆ You've seen the engine. Now run it on your own dojo.
+            </span>
+          </div>
+          <h2 className="font-heading text-4xl md:text-6xl text-white tracking-wide mb-4">
+            YOUR FUNNEL. YOUR STUDENTS.
+            <br />
+            <span className="text-dojo-red">ONE LIVE DEMO.</span>
+          </h2>
+          <p className="text-gray-400 max-w-xl mx-auto mb-8 leading-relaxed">
+            Scroll back to the form. We'll plug your real programs and trial flow into a live MatBoss instance and show you, on a screen-share call, exactly what this looks like running 24/7 on your San Diego dojo.
+          </p>
+          <button
+            onClick={() => {
+              const form = document.querySelector('form');
+              form?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }}
+            className="inline-block px-8 py-4 rounded bg-dojo-red text-white text-sm font-semibold uppercase tracking-widest hover:opacity-90 transition-opacity"
+            style={{ boxShadow: '0 0 25px rgba(220,38,38,0.5), 0 0 60px rgba(220,38,38,0.2)' }}
+          >
+            ↑ Request My Free Demo
+          </button>
+        </div>
+      </div>
+
       <Footer />
+    </div>
+  );
+}
+
+function DemoShowcaseIntro() {
+  return (
+    <div className="relative mt-12 mb-4 py-16 border-y border-dojo-red/10 overflow-hidden">
+      {/* Background accents */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-dojo-red/5 rounded-full blur-[150px]" />
+        <div className="absolute bottom-0 right-1/4 w-[400px] h-[400px] bg-dojo-gold/5 rounded-full blur-[120px]" />
+      </div>
+
+      <div className="relative max-w-4xl mx-auto px-4 text-center">
+        <div className="inline-flex items-center gap-3 mb-6">
+          <div className="h-px w-12 bg-dojo-red/50" />
+          <span className="text-[10px] font-mono text-dojo-red uppercase tracking-[0.3em]">
+            ◆ The Live Demo Showcase ◆
+          </span>
+          <div className="h-px w-12 bg-dojo-red/50" />
+        </div>
+
+        <h2 className="font-heading text-4xl md:text-6xl text-white tracking-wide leading-tight mb-4">
+          DON'T JUST TAKE OUR WORD.
+          <br />
+          <span className="text-dojo-red">PRESS EVERY BUTTON.</span>
+        </h2>
+        <p className="text-gray-400 max-w-2xl mx-auto leading-relaxed mb-2">
+          Six interactive demos below. Zero slides. No stock video. Every widget runs live in your browser — press play, punch in your numbers, talk to the bot, click the branches. This is the exact machinery that runs under the hood at every MatBoss-powered San Diego dojo.
+        </p>
+        <p className="text-gray-500 text-sm max-w-2xl mx-auto leading-relaxed">
+          Fair warning: once you see the gap between what you're doing now and what automation handles in milliseconds, it's hard to un-see it.
+        </p>
+
+        {/* Demo index chips */}
+        <div className="mt-10 flex flex-wrap justify-center gap-3 max-w-3xl mx-auto">
+          {[
+            { id: 'demo-no-show-recovery', label: '01 · No-Show Recovery Engine', color: 'dojo-red' },
+            { id: 'demo-leak-calculator', label: '02 · Enrollment Leak Calculator', color: 'dojo-gold' },
+            { id: 'demo-trial-sequence', label: '03 · 72-Hour Conversion Sequence', color: 'dojo-red' },
+            { id: 'demo-booking-bot', label: '04 · Live Booking Bot', color: 'dojo-gold' },
+            { id: 'demo-admin-hours', label: '05 · Admin Hours Dashboard', color: 'dojo-red' },
+            { id: 'demo-gap-audit', label: '06 · Competitive Gap Audit', color: 'dojo-gold' },
+          ].map((chip) => (
+            <a
+              key={chip.id}
+              href={`#${chip.id}`}
+              onClick={(e) => {
+                e.preventDefault();
+                document.getElementById(chip.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }}
+              className={`text-[10px] font-mono uppercase tracking-widest px-3 py-2 rounded-full border transition-all hover:scale-105 ${
+                chip.color === 'dojo-red'
+                  ? 'border-dojo-red/30 text-dojo-red hover:bg-dojo-red/10 hover:border-dojo-red/60'
+                  : 'border-dojo-gold/30 text-dojo-gold hover:bg-dojo-gold/10 hover:border-dojo-gold/60'
+              }`}
+            >
+              {chip.label}
+            </a>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

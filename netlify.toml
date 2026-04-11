@@ -12,7 +12,7 @@
   targetPort = 5173
   autoLaunch = false
 
-# SEO files — serve directly, do NOT rewrite to index.html
+# SEO files
 [[redirects]]
   from = "/robots.txt"
   to = "/robots.txt"
@@ -20,8 +20,15 @@
 
 [[redirects]]
   from = "/sitemap.xml"
-  to = "/sitemap.xml"
+  to = "/.netlify/functions/sitemap"
   status = 200
+  force = true
+
+[[redirects]]
+  from = "/rss.xml"
+  to = "/.netlify/functions/rss-feed"
+  status = 200
+  force = true
 
 [[redirects]]
   from = "/*"
@@ -63,7 +70,14 @@
   for = "/sitemap.xml"
   [headers.values]
     Content-Type = "application/xml; charset=utf-8"
-    Cache-Control = "public, max-age=86400"
+    Cache-Control = "public, max-age=300"
+
+# SEO: rss.xml caching
+[[headers]]
+  for = "/rss.xml"
+  [headers.values]
+    Content-Type = "application/rss+xml; charset=utf-8"
+    Cache-Control = "public, max-age=300"
 
 # SEO: favicon caching
 [[headers]]

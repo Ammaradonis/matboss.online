@@ -1,4 +1,5 @@
 import { Helmet } from 'react-helmet-async';
+import type { BlogPost } from '../data/posts';
 
 interface SEOProps {
   title?: string;
@@ -15,6 +16,7 @@ interface SEOProps {
   jsonLd?: Record<string, unknown> | Record<string, unknown>[];
   breadcrumbs?: { name: string; url: string }[];
   faq?: { question: string; answer: string }[];
+  rssFeedUrl?: string;
 }
 
 const SITE_URL = 'https://matboss.online';
@@ -205,6 +207,7 @@ function buildFAQSchema(items: { question: string; answer: string }[]) {
 
 export function buildBlogPostSchema(post: {
   title: string;
+  headline: string;
   excerpt: string;
   date: string;
   slug: string;
@@ -213,17 +216,24 @@ export function buildBlogPostSchema(post: {
   readTime: string;
   content: string[];
 }) {
+  const articleUrl = `${SITE_URL}/news/${post.category}/${post.slug}`;
+  const imageUrl = post.thumbnail.startsWith('http') ? post.thumbnail : `${SITE_URL}${post.thumbnail}`;
+
   return {
     '@context': 'https://schema.org',
     '@type': 'BlogPosting',
-    '@id': `${SITE_URL}/news/${post.category}/${post.slug}`,
+    '@id': articleUrl,
+    url: articleUrl,
     headline: post.title,
+    alternativeHeadline: post.headline,
     description: post.excerpt,
-    image: post.thumbnail.startsWith('http') ? post.thumbnail : `${SITE_URL}${post.thumbnail}`,
+    image: imageUrl,
+    thumbnailUrl: imageUrl,
     datePublished: post.date,
     dateModified: post.date,
     wordCount: post.content.join(' ').split(/\s+/).length,
     timeRequired: `PT${parseInt(post.readTime)}M`,
+    articleBody: post.content.join('\n\n'),
     author: {
       '@type': 'Person',
       '@id': `${SITE_URL}/#founder`,
@@ -238,9 +248,10 @@ export function buildBlogPostSchema(post: {
     },
     mainEntityOfPage: {
       '@type': 'WebPage',
-      '@id': `${SITE_URL}/news/${post.category}/${post.slug}`,
+      '@id': articleUrl,
     },
     articleSection: post.category,
+    isAccessibleForFree: true,
     inLanguage: 'en-US',
     isPartOf: { '@id': `${SITE_URL}/#website` },
     about: [
@@ -250,6 +261,73 @@ export function buildBlogPostSchema(post: {
     ],
     keywords: `MatBoss, ${FOUNDER}, San Diego martial arts, enrollment automation, ${post.category}, dojo management, BJJ San Diego`,
   };
+}
+
+export function buildBlogIndexSchema(posts: BlogPost[]) {
+  const featuredPosts = posts.slice(0, 12);
+  const blogUrl = `${SITE_URL}/news`;
+
+  return [
+    {
+      '@context': 'https://schema.org',
+      '@type': 'CollectionPage',
+      '@id': `${blogUrl}#collection`,
+      url: blogUrl,
+      name: 'MatBoss News — San Diego Martial Arts Enrollment Intelligence',
+      description: 'Market intelligence and enrollment automation insights for San Diego martial arts schools by Ammar Alkheder.',
+      isPartOf: { '@id': `${SITE_URL}/#website` },
+      about: [
+        { '@type': 'Thing', name: 'San Diego Martial Arts' },
+        { '@type': 'Thing', name: 'Enrollment Automation' },
+        { '@type': 'Thing', name: 'Martial Arts School Marketing' },
+      ],
+      mainEntity: { '@id': `${blogUrl}#itemlist` },
+    },
+    {
+      '@context': 'https://schema.org',
+      '@type': 'Blog',
+      '@id': `${blogUrl}#blog`,
+      url: blogUrl,
+      name: 'MatBoss News — San Diego Martial Arts Enrollment Intelligence',
+      description: 'Market intelligence and enrollment automation insights for San Diego martial arts schools by Ammar Alkheder.',
+      inLanguage: 'en-US',
+      publisher: { '@id': `${SITE_URL}/#organization` },
+      author: { '@id': `${SITE_URL}/#founder` },
+      blogPost: featuredPosts.map((post) => ({
+        '@id': `${SITE_URL}/news/${post.category}/${post.slug}`,
+      })),
+    },
+    {
+      '@context': 'https://schema.org',
+      '@type': 'ItemList',
+      '@id': `${blogUrl}#itemlist`,
+      url: blogUrl,
+      numberOfItems: posts.length,
+      itemListOrder: 'https://schema.org/ItemListOrderDescending',
+      itemListElement: featuredPosts.map((post, index) => ({
+        '@type': 'ListItem',
+        position: index + 1,
+        url: `${SITE_URL}/news/${post.category}/${post.slug}`,
+        name: post.title,
+        description: post.excerpt,
+      })),
+    },
+    {
+      '@context': 'https://schema.org',
+      '@type': 'DataFeed',
+      '@id': `${SITE_URL}/rss.xml#feed`,
+      url: `${SITE_URL}/rss.xml`,
+      name: 'MatBoss News RSS Feed',
+      dateModified: featuredPosts[0]?.date,
+      dataFeedElement: featuredPosts.map((post) => ({
+        '@type': 'DataFeedItem',
+        dateCreated: post.date,
+        item: {
+          '@id': `${SITE_URL}/news/${post.category}/${post.slug}`,
+        },
+      })),
+    },
+  ];
 }
 
 export default function SEO({
@@ -263,11 +341,15 @@ export default function SEO({
   jsonLd,
   breadcrumbs,
   faq,
+  rssFeedUrl,
 }: SEOProps) {
   const pageTitle = title ? `${title} | ${SITE_NAME}` : DEFAULT_TITLE;
   const pageDesc = description || DEFAULT_DESC;
   const pageUrl = canonical ? (canonical.startsWith('http') ? canonical : `${SITE_URL}${canonical}`) : SITE_URL;
   const pageImage = ogImage || DEFAULT_IMAGE;
+  const resolvedRssFeedUrl = rssFeedUrl
+    ? (rssFeedUrl.startsWith('http') ? rssFeedUrl : `${SITE_URL}${rssFeedUrl}`)
+    : null;
 
   // Collect all JSON-LD schemas to inject
   const schemas: Record<string, unknown>[] = [organizationSchema, websiteSchema, personSchema];
@@ -284,6 +366,14 @@ export default function SEO({
       <title>{pageTitle}</title>
       <meta name="description" content={pageDesc} />
       <link rel="canonical" href={pageUrl} />
+      {resolvedRssFeedUrl && (
+        <link
+          rel="alternate"
+          type="application/rss+xml"
+          title="MatBoss News RSS Feed"
+          href={resolvedRssFeedUrl}
+        />
+      )}
       {noindex && <meta name="robots" content="noindex,nofollow" />}
       {!noindex && <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1" />}
 
