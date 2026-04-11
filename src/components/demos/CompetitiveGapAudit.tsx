@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useSanDiegoClock, minutesToHuman } from './sdTime';
 
 interface School {
   id: string;
@@ -32,6 +33,7 @@ const SCHOOLS: School[] = [
 type SortKey = 'rank' | 'response' | 'followups' | 'score';
 
 export default function CompetitiveGapAudit() {
+  const clock = useSanDiegoClock(30000);
   const [selected, setSelected] = useState<School | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>('rank');
   const [revealed, setRevealed] = useState(true);
@@ -84,8 +86,15 @@ export default function CompetitiveGapAudit() {
               Field Audit · 12 Schools · 9 Neighborhoods
             </span>
           </div>
-          <div className="text-[10px] font-mono text-gray-500 uppercase tracking-widest">
-            Data collected Q1 2026
+          <div className="text-[10px] font-mono text-gray-500 uppercase tracking-widest flex items-center gap-3 flex-wrap">
+            <span>Data collected Q1 2026</span>
+            <span className="text-gray-700">·</span>
+            <span>
+              SD <span className="text-dojo-gold">{clock.clock12.replace(/:\d\d (AM|PM)$/, ' $1')}</span> {clock.tzLabel}
+            </span>
+            {!clock.frontDeskOpen && (
+              <span className="text-dojo-red">· 11 of 12 competitors CLOSED · reopen {minutesToHuman(clock.minutesUntilFrontDeskOpen)}</span>
+            )}
           </div>
         </div>
 

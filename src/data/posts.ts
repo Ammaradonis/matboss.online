@@ -1,7 +1,16 @@
+export const blogCategories = [
+  'product',
+  'announcements',
+  'policy',
+  'company',
+  'social',
+  'market',
+] as const;
+
 export interface BlogPost {
   id: string;
   slug: string;
-  category: 'product' | 'announcements' | 'policy' | 'company' | 'social' | 'market';
+  category: (typeof blogCategories)[number];
   title: string;
   headline: string;
   excerpt: string;
@@ -385,10 +394,41 @@ export function getPostBySlug(slug: string): BlogPost | undefined {
   return posts.find((p) => p.slug === slug);
 }
 
-export function getPostsByCategory(category: BlogPost['category']): BlogPost[] {
-  return posts.filter((p) => p.category === category);
+export function getPostBySlugFrom(postsToSearch: BlogPost[], slug: string): BlogPost | undefined {
+  return postsToSearch.find((post) => post.slug === slug);
 }
 
-export function getFeaturedPosts(count = 5): BlogPost[] {
-  return [...posts].slice(0, count);
+export function getPostsByCategory(
+  category: BlogPost['category'],
+  postsToSearch: BlogPost[] = posts,
+): BlogPost[] {
+  return postsToSearch.filter((post) => post.category === category);
+}
+
+export function getFeaturedPosts(count = 5, postsToSearch: BlogPost[] = posts): BlogPost[] {
+  return [...postsToSearch].slice(0, count);
+}
+
+export function sortPostsByDate(postsToSort: BlogPost[]): BlogPost[] {
+  return [...postsToSort].sort((left, right) => {
+    const dateCompare = right.date.localeCompare(left.date);
+    if (dateCompare !== 0) {
+      return dateCompare;
+    }
+
+    return right.id.localeCompare(left.id);
+  });
+}
+
+export function mergePosts(primaryPosts: BlogPost[], fallbackPosts: BlogPost[] = posts): BlogPost[] {
+  const merged = new Map<string, BlogPost>();
+
+  for (const post of [...primaryPosts, ...fallbackPosts]) {
+    const key = post.slug || post.id;
+    if (!merged.has(key)) {
+      merged.set(key, post);
+    }
+  }
+
+  return sortPostsByDate([...merged.values()]);
 }

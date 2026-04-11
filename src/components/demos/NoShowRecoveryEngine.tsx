@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { formatSDTimestamp, useSanDiegoClock, minutesToHuman } from './sdTime';
 
 type Channel = 'SMS' | 'EMAIL' | 'SYSTEM';
 type StepStatus = 'queued' | 'sending' | 'delivered' | 'read' | 'triggered' | 'failed';
@@ -36,11 +37,11 @@ const SD_LOCATIONS = [
 ];
 
 function tsNow() {
-  const d = new Date();
-  return d.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  return formatSDTimestamp();
 }
 
 export default function NoShowRecoveryEngine() {
+  const sd = useSanDiegoClock(30000);
   const [studentName, setStudentName] = useState('Marcus Chen');
   const [martialArt, setMartialArt] = useState('Brazilian Jiu-Jitsu');
   const [location, setLocation] = useState('North Park');
@@ -274,8 +275,17 @@ export default function NoShowRecoveryEngine() {
               Recovery Engine — {running ? 'RUNNING' : complete ? 'COMPLETE' : 'IDLE'}
             </span>
           </div>
-          <div className="font-mono text-xs text-gray-500">
-            SIM TIME <span className="text-white">{(clock / 1000).toFixed(1)}s</span> / 28.0s
+          <div className="font-mono text-xs text-gray-500 flex items-center gap-3 flex-wrap">
+            <span>
+              SIM TIME <span className="text-white">{(clock / 1000).toFixed(1)}s</span> / 28.0s
+            </span>
+            <span className="text-gray-700">·</span>
+            <span>
+              SD <span className="text-dojo-gold">{sd.clock12.replace(/:\d\d (AM|PM)$/, ' $1')}</span> {sd.tzLabel}
+            </span>
+            {!sd.frontDeskOpen && (
+              <span className="text-dojo-red">· front desk CLOSED · {minutesToHuman(sd.minutesUntilFrontDeskOpen)} until reopen</span>
+            )}
           </div>
         </div>
 

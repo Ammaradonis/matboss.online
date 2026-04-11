@@ -3,6 +3,28 @@ How to Post to the Blog
 node scripts/new-post.cjs --title "MatBoss vs GymMaster: Which System Actually Increases Martial Arts Enrollments?" --category market --date 2024-12-19
 
 
+There is no special id pattern right now.
+
+  To pass validation, id only needs to be:
+
+  - a JSON string
+  - non-empty after trimming
+  - at most 120 characters
+
+  That comes from /C:/Users/FingerWeg/CascadeProjects/matboss.online/netlify/functions/news-posts.ts:60 and the id check
+  in /C:/Users/FingerWeg/CascadeProjects/matboss.online/netlify/functions/news-posts.ts:141.
+
+  Examples that pass:
+
+  - post-009
+  - make-20260411-001
+  - news_2026_04_11_a
+  - 550e8400-e29b-41d4-a716-446655440000
+
+  One more constraint: the DB stores id as the primary key, so it must be unique if you want a new post. That is defined
+  in /C:/Users/FingerWeg/CascadeProjects/matboss.online/netlify/functions/blog-store.ts:18. If you reuse an existing id,
+  the endpoint updates that post. If you use a new id but reuse an existing slug, the request will fail on the unique
+  slug constraint.
 
 Automated route for Make.com
 

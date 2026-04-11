@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { formatSDTimestamp, useSanDiegoClock, minutesToHuman } from './sdTime';
 
 type Operator = 'owner' | 'front-desk' | 'matboss';
 
@@ -38,6 +39,7 @@ const LIVE_FEED_EVENTS = [
 ];
 
 export default function AdminHoursSavedDashboard() {
+  const clock = useSanDiegoClock(30000);
   const [operator, setOperator] = useState<Operator>('owner');
   const [hourlyRate, setHourlyRate] = useState(75);
   const [feedItems, setFeedItems] = useState<{ id: number; channel: string; text: string; color: string; time: string }[]>([]);
@@ -63,7 +65,7 @@ export default function AdminHoursSavedDashboard() {
     if (!revealed) return;
     const addEvent = () => {
       const ev = LIVE_FEED_EVENTS[Math.floor(Math.random() * LIVE_FEED_EVENTS.length)];
-      const now = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      const now = formatSDTimestamp();
       setFeedItems((prev) => [
         { id: feedIdRef.current++, ...ev, time: now },
         ...prev,
@@ -135,8 +137,12 @@ export default function AdminHoursSavedDashboard() {
               Time Audit · Typical San Diego Dojo
             </span>
           </div>
-          <div className="text-[10px] font-mono text-gray-500 uppercase tracking-widest">
-            6-day week · 52 weeks/year
+          <div className="text-[10px] font-mono text-gray-500 uppercase tracking-widest flex items-center gap-3 flex-wrap">
+            <span>6-day week · 52 weeks/year</span>
+            <span className="text-gray-700">·</span>
+            <span>
+              SD <span className="text-dojo-gold">{clock.clock12.replace(/:\d\d (AM|PM)$/, ' $1')}</span> {clock.tzLabel}
+            </span>
           </div>
         </div>
 
@@ -259,7 +265,9 @@ export default function AdminHoursSavedDashboard() {
                 Live Automation Feed — Happening Right Now
               </span>
             </div>
-            <span className="text-[9px] font-mono text-gray-600">{feedItems.length} events</span>
+            <span className="text-[9px] font-mono text-gray-600">
+              {feedItems.length} events · {clock.frontDeskOpen ? 'front desk open' : `front desk CLOSED · ${minutesToHuman(clock.minutesUntilFrontDeskOpen)} until reopen`}
+            </span>
           </div>
           <div className="p-4 font-mono text-[11px] space-y-1 max-h-48 overflow-y-auto">
             {feedItems.length === 0 ? (
