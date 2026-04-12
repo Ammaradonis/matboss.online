@@ -2,6 +2,7 @@ import { useParams, Link, Navigate } from 'react-router-dom';
 import { getPostBySlugFrom, categoryLabels, categoryColors } from '../data/posts';
 import SEO, { buildBlogPostSchema } from '../components/SEO';
 import Footer from '../components/Footer';
+import ContentRenderer from '../components/ContentRenderer';
 import useBlogPosts from '../hooks/useBlogPosts';
 
 export default function BlogPostPage() {
@@ -124,25 +125,7 @@ export default function BlogPostPage() {
         </div>
 
         {/* Content */}
-        <div className="space-y-5">
-          {post.content.map((block, i) => {
-            if (block.startsWith('## ')) {
-              return (
-                <h2
-                  key={i}
-                  className="font-heading text-2xl sm:text-3xl text-white mt-10 mb-4"
-                >
-                  {block.replace('## ', '')}
-                </h2>
-              );
-            }
-            return (
-              <p key={i} className="text-gray-400 text-sm sm:text-base leading-relaxed">
-                {block}
-              </p>
-            );
-          })}
-        </div>
+        <ContentRenderer content={post.content} />
 
         {/* Bottom divider */}
         <div className="section-divider my-12" />

@@ -48,6 +48,8 @@ type MessageKind =
   | 'preempt';
 
 type Mode = 'explore' | 'assist' | 'close';
+type GeoStatus = 'unknown' | 'local' | 'non-local' | 'shared' | 'denied';
+type TravelMode = 'local' | 'visitor' | 'virtual';
 
 type ObjectionKey = 'price' | 'safety' | 'wear' | 'time' | 'insurance' | 'kid-safety';
 
@@ -68,6 +70,24 @@ interface ScheduleSlot {
 }
 
 type SDNeighborhood = 'North Park' | 'Pacific Beach' | 'La Jolla' | 'Chula Vista' | 'Hillcrest' | 'Carlsbad';
+
+const SD_LOCATION_COORDS: Record<SDNeighborhood, { lat: number; lng: number }> = {
+  'North Park': { lat: 32.7411, lng: -117.1297 },
+  'Pacific Beach': { lat: 32.7978, lng: -117.2405 },
+  'La Jolla': { lat: 32.8328, lng: -117.2713 },
+  'Chula Vista': { lat: 32.6401, lng: -117.0842 },
+  'Hillcrest': { lat: 32.7489, lng: -117.1647 },
+  'Carlsbad': { lat: 33.1581, lng: -117.3506 },
+};
+
+const ZIP_TO_NEIGHBORHOOD: Record<string, SDNeighborhood> = {
+  '92103': 'Hillcrest',
+  '92104': 'North Park',
+  '92109': 'Pacific Beach',
+  '92037': 'La Jolla',
+  '91910': 'Chula Vista',
+  '92008': 'Carlsbad',
+};
 
 interface ChatMessage {
   id: number;
@@ -94,11 +114,18 @@ interface Entities {
   experience?: 'Beginner' | 'Some' | 'Experienced';
   location?: SDNeighborhood;
   preferredTime?: 'morning' | 'evening' | 'weekend';
+  preferredDay?: 'weekday' | 'weekend' | 'either';
   audienceType?: 'adult' | 'parent' | 'teen';
+  budgetHint?: 'value' | 'premium';
+  zipCode?: string;
+  email?: string;
+  phone?: string;
+  travelMode?: TravelMode;
 }
 
 interface MemoryLayer {
   objections: ObjectionKey[];
+  objectionCounts: Partial<Record<ObjectionKey, number>>;
   hesitations: number;
   engagementScore: number;
   messageCount: number;
@@ -172,6 +199,22 @@ const INTENT_PATTERNS: Record<string, { keywords: RegExp[]; weight: number }> = 
   'escalate:human':     { keywords: [/human/i, /real person/i, /talk to someone/i, /not a bot/i], weight: 2 },
 };
 
+const INTENT_EXAMPLES: Record<string, string[]> = {
+  'art:BJJ': ['i want to learn jiu jitsu', 'looking for a grappling class', 'want to try bjj'],
+  'art:Muay Thai': ['i want to learn striking', 'looking for kickboxing', 'want muay thai'],
+  'art:MMA': ['i want mma classes', 'want mixed martial arts', 'i watch ufc and want to train'],
+  'age:Kid': ['this is for my 8 year old', 'looking for classes for my son', 'need something for my daughter'],
+  'objection:price': ['how much does it cost', 'is it expensive', 'what are your prices'],
+  'objection:safety': ['is it safe', 'i am worried about injury', 'will my kid get hurt'],
+  'objection:wear': ['what should i wear', 'do i need a gi', 'what clothes do i bring'],
+  'objection:time': ['i am busy after work', 'do you have weekend classes', 'how much time do i need'],
+  'exp:Beginner': ['i have never done this before', 'i am totally new', 'first class ever'],
+  'exp:Some': ['i have trained a little', 'i dabbled before', 'some experience'],
+  'exp:Experienced': ['i have been training for years', 'i compete already', 'advanced student'],
+  'action:book': ['book me in', 'sign me up for a trial', 'reserve me a spot'],
+  'escalate:human': ['can i talk to a real person', 'i need a human', 'not a bot please'],
+};
+
 const NEGATIVE_WORDS = /(worried|scared|not sure|hate|expensive|nervous|anxious|confused|frustrated|overwhelmed|skeptical|afraid|unsure|hesitant)/i;
 const POSITIVE_WORDS = /(excited|ready|love|awesome|perfect|great|let's|can'?t wait|hyped|stoked|pumped)/i;
 
@@ -197,6 +240,13 @@ function scoreIntents(text: string): { intent: string; confidence: number }[] {
     for (const t of intentTokens) {
       if (t.length > 2 && tokens.includes(t)) score += 0.4;
     }
+    const examples = INTENT_EXAMPLES[intent] ?? [];
+    const exampleBoost = examples.reduce((best, sample) => {
+      const sampleTokens = tokenize(sample);
+      const overlap = sampleTokens.filter(token => tokens.includes(token)).length;
+      return Math.max(best, sampleTokens.length ? overlap / sampleTokens.length : 0);
+    }, 0);
+    score += exampleBoost * 1.2;
     if (score > 0) {
       scores[intent] = score / (1 + Math.log10(tokenCount));
     }
@@ -245,6 +295,21 @@ function extractEntities(text: string, existing: Entities): Entities {
   const kidNameMatch = text.match(/(?:son|daughter|kid|child)\s+([A-Z][a-z]+)/i);
   if (kidNameMatch) out.kidName = kidNameMatch[1];
 
+  const emailMatch = text.match(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i);
+  if (emailMatch) out.email = emailMatch[0].toLowerCase();
+
+  const phoneMatch = text.match(/(?:\+?1[-.\s]?)?(?:\(?\d{3}\)?[-.\s]?){2}\d{4}/);
+  if (phoneMatch) {
+    const digits = phoneMatch[0].replace(/\D/g, '').slice(-10);
+    if (digits.length === 10) out.phone = `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+
+  const zipMatch = text.match(/\b(92\d{3})\b/);
+  if (zipMatch) {
+    out.zipCode = zipMatch[1];
+    if (ZIP_TO_NEIGHBORHOOD[zipMatch[1]]) out.location = ZIP_TO_NEIGHBORHOOD[zipMatch[1]];
+  }
+
   // Location
   for (const n of SD_NEIGHBORHOODS) {
     if (new RegExp(n, 'i').test(text)) {
@@ -257,6 +322,9 @@ function extractEntities(text: string, existing: Entities): Entities {
   // Audience
   if (/\b(my kid|my son|my daughter|my child)\b/i.test(text)) out.audienceType = 'parent';
   if (/\bfor myself\b|\bfor me\b/i.test(text) && !out.audienceType) out.audienceType = 'adult';
+  if (/virtual|zoom|call me|phone consult/i.test(text)) out.travelMode = 'virtual';
+  else if (/travel|visiting|visitor|out of town|not local|outside san diego/i.test(text)) out.travelMode = 'visitor';
+  else if (!out.travelMode) out.travelMode = 'local';
 
   // Experience
   if (/beginner|never done|first time|new to|no experience|total noob/i.test(text)) out.experience = 'Beginner';
@@ -274,6 +342,13 @@ function extractEntities(text: string, existing: Entities): Entities {
   if (/evening|after work|\b[67]\s*pm/i.test(text)) out.preferredTime = 'evening';
   else if (/morning|early/i.test(text)) out.preferredTime = 'morning';
   else if (/weekend|sat\b|sunday/i.test(text)) out.preferredTime = 'weekend';
+
+  if (/weekdays?|after school|school nights/i.test(text)) out.preferredDay = 'weekday';
+  else if (/weekend|sat|sunday/i.test(text)) out.preferredDay = 'weekend';
+  else if (/either|any day|flexible/i.test(text)) out.preferredDay = 'either';
+
+  if (/budget|cheap|afford|value/i.test(text)) out.budgetHint = 'value';
+  else if (/premium|best|top tier|vip/i.test(text)) out.budgetHint = 'premium';
 
   return out;
 }
@@ -298,7 +373,10 @@ function matchSlots(entities: Entities, slots: ScheduleSlot[]): ScheduleSlot[] {
     if (beg.length > 0) filtered = beg;
   }
 
-  if (entities.preferredTime === 'weekend') {
+  if (entities.preferredDay === 'weekday') {
+    const weekdays = filtered.filter(s => s.isoDay >= 1 && s.isoDay <= 5);
+    if (weekdays.length > 0) filtered = weekdays;
+  } else if (entities.preferredDay === 'weekend' || entities.preferredTime === 'weekend') {
     const wk = filtered.filter(s => s.isoDay === 0 || s.isoDay === 6);
     if (wk.length > 0) filtered = wk;
   } else if (entities.preferredTime === 'evening') {
@@ -309,10 +387,22 @@ function matchSlots(entities: Entities, slots: ScheduleSlot[]): ScheduleSlot[] {
     if (mr.length > 0) filtered = mr;
   }
 
-  // Location-first ordering
-  if (entities.location) {
-    filtered.sort((a, b) => (a.location === entities.location ? -1 : b.location === entities.location ? 1 : 0));
-  }
+  filtered = filtered
+    .map(slot => {
+      let score = 0;
+      if (entities.location && slot.location === entities.location) score += 10;
+      if (entities.experience === 'Beginner' && slot.beginnerFriendly) score += 4;
+      if (entities.audienceType === 'parent' && slot.kidFriendly) score += 5;
+      if (entities.preferredTime === 'evening' && slot.hour >= 17) score += 3;
+      if (entities.preferredTime === 'morning' && slot.hour < 12) score += 3;
+      if ((entities.preferredDay === 'weekend' || entities.travelMode === 'visitor') && slot.isoDay === 6) score += 4;
+      if (entities.travelMode === 'visitor' && slot.hour < 13) score += 2;
+      score += Math.max(0, 4 - slot.spotsLeft);
+      score += Math.min(slot.recentSignups, 12) * 0.15;
+      return { slot, score };
+    })
+    .sort((a, b) => b.score - a.score)
+    .map(entry => entry.slot);
 
   return filtered.slice(0, 4);
 }
@@ -332,6 +422,173 @@ function calculateTypingDelay(previousBotText: string, nextKind: MessageKind): n
   return Math.max(400, readingTime * 0.3 + thinking);
 }
 
+function toObjectionKey(intent?: string): ObjectionKey | null {
+  if (!intent?.startsWith('objection:')) return null;
+  return intent.split(':')[1] as ObjectionKey;
+}
+
+function deriveNextMemory(
+  current: MemoryLayer,
+  text: string,
+  topIntent: { intent: string; confidence: number } | undefined,
+  gainedEntity: boolean
+): MemoryLayer {
+  const sameTwice = current.lastUserMessage.toLowerCase() === text.toLowerCase();
+  const next: MemoryLayer = {
+    ...current,
+    objections: [...current.objections],
+    objectionCounts: { ...current.objectionCounts },
+    messageCount: current.messageCount + 1,
+    lastUserMessage: text,
+    sameMessageTwice: sameTwice,
+    engagementScore: current.engagementScore + (gainedEntity ? 12 : 5),
+    confidenceScore: current.confidenceScore,
+    unclearCount: current.unclearCount,
+    hesitations: current.hesitations,
+  };
+
+  if (sameTwice) {
+    next.confidenceScore = Math.max(0, next.confidenceScore - 0.3);
+    next.hesitations += 1;
+  }
+
+  if (!topIntent || topIntent.confidence < 0.35) {
+    next.unclearCount += 1;
+    next.confidenceScore = Math.max(0, next.confidenceScore - 0.15);
+  }
+
+  const objection = toObjectionKey(topIntent?.intent);
+  if (objection) {
+    const count = (next.objectionCounts[objection] ?? 0) + 1;
+    next.objectionCounts[objection] = count;
+    if (!next.objections.includes(objection)) next.objections.push(objection);
+    if (count >= 2) {
+      next.hesitations += 1;
+      next.confidenceScore = Math.max(0, next.confidenceScore - 0.1);
+    }
+  }
+
+  return next;
+}
+
+function deriveNextState(
+  current: ConversationState,
+  topIntent: { intent: string; confidence: number } | undefined
+): ConversationState {
+  let score = current.leadScore;
+  if (topIntent) {
+    if (topIntent.intent.startsWith('action:book')) score += 25;
+    if (topIntent.intent.startsWith('art:')) score += 12;
+    if (topIntent.intent.startsWith('age:Kid')) score += 15;
+    if (topIntent.intent.startsWith('exp:')) score += 10;
+    if (topIntent.intent.startsWith('time:')) score += 8;
+    if (topIntent.intent.startsWith('location:')) score += 7;
+    if (topIntent.intent === 'greeting') score += 3;
+    if (topIntent.intent === 'objection:price') score -= 10;
+    if (topIntent.intent === 'objection:safety') score -= 6;
+    if (topIntent.intent === 'objection:insurance') score -= 8;
+  }
+  score = Math.max(0, Math.min(100, score));
+
+  let mode: Mode = current.mode;
+  if (score >= 80 || current.messagesSent >= 8) mode = 'close';
+  else if (score >= 50) mode = 'assist';
+  else mode = 'explore';
+
+  return {
+    ...current,
+    leadScore: score,
+    hotLead: score >= 70,
+    mode,
+    messagesSent: current.messagesSent + 1,
+  };
+}
+
+function distanceMiles(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const toRad = (deg: number) => deg * (Math.PI / 180);
+  const earthRadiusMiles = 3958.8;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return earthRadiusMiles * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function nearestNeighborhood(lat: number, lng: number) {
+  return Object.entries(SD_LOCATION_COORDS)
+    .map(([name, coords]) => ({
+      neighborhood: name as SDNeighborhood,
+      distance: distanceMiles(lat, lng, coords.lat, coords.lng),
+    }))
+    .sort((a, b) => a.distance - b.distance)[0];
+}
+
+function getFrontDeskBaselineMs(clock: Pick<ReturnType<typeof sdNow>, 'frontDeskOpen' | 'hour24' | 'weekdayIdx' | 'minutesUntilFrontDeskOpen'>) {
+  if (!clock.frontDeskOpen) return clock.minutesUntilFrontDeskOpen * 60_000;
+  if (clock.weekdayIdx === 6) return 4 * 60_000;
+  if (clock.hour24 < 11) return 5 * 60_000;
+  if (clock.hour24 < 14) return 3 * 60_000;
+  if (clock.hour24 < 17) return 4 * 60_000;
+  return 6 * 60_000;
+}
+
+function getSmartReplies({
+  step,
+  entities,
+  memory,
+  recentMessages,
+  geoStatus,
+  fallback,
+}: {
+  step: ConversationState['step'];
+  entities: Entities;
+  memory: MemoryLayer;
+  recentMessages: ChatMessage[];
+  geoStatus: GeoStatus;
+  fallback: string[];
+}) {
+  const recentUserText = recentMessages
+    .filter(message => message.sender === 'user')
+    .map(message => message.text.toLowerCase())
+    .join(' ');
+
+  let replies = fallback;
+  if (step === 'greeting' && geoStatus === 'non-local' && !fallback.includes('Yes, continue')) {
+    replies = ['Use my location', 'Show weekend traveler slots', 'Book a virtual intro'];
+  } else if (step === 'qualify-art' && entities.audienceType === 'parent') {
+    replies = ['Kids BJJ', 'Kids martial arts', 'Safety first'];
+  } else if (step === 'qualify-exp' && entities.art) {
+    replies = ['Total beginner', 'Some experience', 'Been training a while'];
+  } else if (step === 'micro-day-pref') {
+    replies = ['Weekdays', 'Weekends', 'Either works'];
+  } else if (step === 'micro-time-pref') {
+    replies = ['Evening after 5', 'Morning / earlier', 'Either'];
+  } else if (step === 'escalate') {
+    replies = ['Yes, request callback', 'Text is better', 'Keep chatting here'];
+  } else if (step === 'post-booking') {
+    replies = ['📹 Yes, send warm-up video', '🅿️ Send parking PDF', '👯 Add a friend for free', "I'm good for now"];
+  } else if (memory.objections.includes('price')) {
+    replies = ['First class is free', 'Show beginner slots', 'Talk to Carlos'];
+  } else if (recentUserText.includes('kid')) {
+    replies = ['Kids BJJ', 'Kids martial arts', 'Show after-school slots'];
+  }
+
+  return Array.from(new Set(replies)).slice(0, 4);
+}
+
+function predictResponseKind(
+  topIntent: { intent: string; confidence: number } | undefined,
+  sentiment: 'neg' | 'neu' | 'pos',
+  nextMemory: MemoryLayer,
+  newEntities: Entities
+): MessageKind {
+  if (!topIntent || topIntent.confidence < 0.35 || nextMemory.unclearCount >= 2) return 'clarify';
+  if (sentiment === 'neg') return 'empathy';
+  if (topIntent.intent.startsWith('objection:')) return 'microproof';
+  if (topIntent.intent.startsWith('action:book') || (newEntities.art && newEntities.experience)) return 'schedule';
+  return 'text';
+}
+
 /** Predict the next likely objection based on entity profile. */
 function predictNextObjection(ents: Entities, raised: ObjectionKey[]): ObjectionKey | null {
   const candidates: ObjectionKey[] = [];
@@ -349,7 +606,7 @@ function bestNextMove(
   memory: MemoryLayer
 ): 'greet' | 'clarify' | 'qualify' | 'preempt' | 'offer-slots' | 'close' | 'escalate' | 'microproof' {
   if (memory.confidenceScore < 0.45 || memory.unclearCount >= 2) return 'escalate';
-  if (memory.objections.length >= 3) return 'escalate';
+  if (memory.objections.length >= 3 || Object.values(memory.objectionCounts).some(count => (count ?? 0) >= 2)) return 'escalate';
   if (state.leadScore >= 80 && state.step !== 'done') return 'close';
   if (state.step === 'greeting' && state.messagesSent === 0) return 'greet';
   if (!entities.audienceType && !entities.art) return 'qualify';
@@ -412,6 +669,7 @@ const INITIAL_STATE: ConversationState = {
 
 const INITIAL_MEMORY: MemoryLayer = {
   objections: [],
+  objectionCounts: {},
   hesitations: 0,
   engagementScore: 0,
   messageCount: 0,
@@ -433,11 +691,15 @@ export default function LiveBookingBot() {
   const [responseTimes, setResponseTimes] = useState<number[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [isReturning, setIsReturning] = useState(false);
+  const [geoStatus, setGeoStatus] = useState<GeoStatus>('unknown');
+  const [lastOfferedSlots, setLastOfferedSlots] = useState<ScheduleSlot[]>([]);
   const [lastActivityAt, setLastActivityAt] = useState<number>(Date.now());
   const chatEndRef = useRef<HTMLDivElement>(null);
   const nextId = useRef(1);
   const idleTimerRef = useRef<number | null>(null);
+  const hiddenAtRef = useRef<number | null>(null);
   const bootedRef = useRef(false);
+  const sessionIdRef = useRef(`local-${Math.random().toString(36).slice(2, 8)}`);
 
   /* ─── Persist on every change ─── */
   useEffect(() => {
@@ -447,17 +709,25 @@ export default function LiveBookingBot() {
       memory,
       state: { step: state.step, leadScore: state.leadScore, mode: state.mode },
       lastVisit: new Date().toISOString(),
-      sessionId: 'local-' + Math.random().toString(36).slice(2, 8),
+      sessionId: sessionIdRef.current,
     });
   }, [entities, memory, state]);
 
   /* ─── Rehydrate on mount ─── */
   useEffect(() => {
+    const browserTz = typeof Intl !== 'undefined'
+      ? Intl.DateTimeFormat().resolvedOptions().timeZone
+      : '';
+    const appearsLocal = !browserTz || browserTz === 'America/Los_Angeles';
+    setGeoStatus(appearsLocal ? 'local' : 'non-local');
+
     const profile = loadProfile();
     if (profile && profile.entities && Object.keys(profile.entities).length > 0) {
+      sessionIdRef.current = profile.sessionId || sessionIdRef.current;
       setIsReturning(true);
       setEntities(profile.entities);
       setMemory(prev => ({ ...prev, ...profile.memory }));
+      if (profile.entities.location) setGeoStatus('shared');
       const lastVisit = new Date(profile.lastVisit);
       const hoursAgo = Math.round((Date.now() - lastVisit.getTime()) / (1000 * 60 * 60));
       const welcomeText = profile.entities.name
@@ -468,7 +738,14 @@ export default function LiveBookingBot() {
         pushBot({
           kind: 'rehydrate',
           text: welcomeText,
-          quickReplies: ['Yes, continue', 'Start fresh', 'Show me slots'],
+          quickReplies: getSmartReplies({
+            step: 'greeting',
+            entities: profile.entities,
+            memory: profile.memory,
+            recentMessages: [],
+            geoStatus: profile.entities.location ? 'shared' : (appearsLocal ? 'local' : 'non-local'),
+            fallback: ['Yes, continue', 'Start fresh', 'Show me slots'],
+          }),
         });
       }, 700);
     } else {
@@ -476,8 +753,15 @@ export default function LiveBookingBot() {
       window.setTimeout(() => {
         pushBot({
           kind: 'quick-replies',
-          text: `Hey there 👊 Welcome to Pacific Coast Martial Arts. I'm the MatBoss booking engine — trained on every San Diego dojo question. It's currently ${clock.clock12.replace(/:\d\d (AM|PM)$/, ' $1')} ${clock.tzLabel} here at the dojo. What brings you in today?`,
-          quickReplies: ['I want to try a class', 'Is it safe for beginners?', 'Book a kids trial', 'What do you offer?'],
+          text: `Hey there 👊 Welcome to Pacific Coast Martial Arts. I'm the MatBoss booking engine — trained on every San Diego dojo question. It's currently ${clock.clock12.replace(/:\d\d (AM|PM)$/, ' $1')} ${clock.tzLabel} here at the dojo.${appearsLocal ? '' : ` It looks like you may be outside San Diego, so I can also show travel-friendly or virtual options.`} What brings you in today?`,
+          quickReplies: getSmartReplies({
+            step: 'greeting',
+            entities: {},
+            memory: INITIAL_MEMORY,
+            recentMessages: [],
+            geoStatus: appearsLocal ? 'local' : 'non-local',
+            fallback: ['I want to try a class', 'Is it safe for beginners?', 'Book a kids trial', 'What do you offer?'],
+          }),
         });
       }, 800);
     }
@@ -496,9 +780,10 @@ export default function LiveBookingBot() {
     if (idleTimerRef.current) window.clearTimeout(idleTimerRef.current);
     idleTimerRef.current = window.setTimeout(() => {
       if (Date.now() - lastActivityAt >= 44000) {
+        const featuredSlot = lastOfferedSlots[0] || slots[0];
         pushBot({
           kind: 'text',
-          text: `Still there? I can see you're checking out the slots — want me to hold one for 10 minutes while you decide? The ${slots[0]?.day} ${slots[0]?.time} slot at ${slots[0]?.location} has only ${slots[0]?.spotsLeft} spots left.`,
+          text: `Still there? I can see you're checking out the slots — want me to hold one for 10 minutes while you decide? The ${featuredSlot?.day} ${featuredSlot?.time} slot at ${featuredSlot?.location} has only ${featuredSlot?.spotsLeft} spots left.`,
         });
         setMemory(m => ({ ...m, hesitations: m.hesitations + 1 }));
       }
@@ -507,7 +792,36 @@ export default function LiveBookingBot() {
       if (idleTimerRef.current) window.clearTimeout(idleTimerRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.step, lastActivityAt]);
+  }, [state.step, lastActivityAt, lastOfferedSlots, slots]);
+
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.hidden) {
+        hiddenAtRef.current = Date.now();
+        return;
+      }
+
+      if (
+        state.step === 'schedule'
+        && hiddenAtRef.current
+        && Date.now() - hiddenAtRef.current >= 45000
+      ) {
+        const featuredSlot = lastOfferedSlots[0];
+        pushBot({
+          kind: 'text',
+          text: featuredSlot
+            ? `Welcome back — I kept the ${featuredSlot.day} ${featuredSlot.time} ${featuredSlot.label} option at the top for you. Want me to hold it while you check your calendar?`
+            : 'Welcome back — want me to keep the best beginner slot warm while you decide?',
+        });
+        setMemory(prev => ({ ...prev, hesitations: prev.hesitations + 1 }));
+      }
+
+      hiddenAtRef.current = null;
+    };
+
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange);
+  }, [lastOfferedSlots, state.step]);
 
   /* ─── Message factories ─── */
   const pushBot = useCallback((opts: Omit<ChatMessage, 'id' | 'sender'>) => {
@@ -521,6 +835,68 @@ export default function LiveBookingBot() {
   const pushUser = useCallback((text: string) => {
     setMessages(prev => [...prev, { id: nextId.current++, sender: 'user', kind: 'text', text }]);
   }, []);
+
+  const recentMessages = useMemo(() => messages.slice(-3), [messages]);
+
+  const resolveLocationSignal = useCallback((location: SDNeighborhood, source: GeoStatus, distance?: number) => {
+    setEntities(prev => ({ ...prev, location, travelMode: distance && distance > 80 ? 'visitor' : (prev.travelMode || 'local') }));
+    setGeoStatus(source);
+
+    if (distance && distance > 80) {
+      pushBot({
+        kind: 'quick-replies',
+        text: `Looks like you're about ${Math.round(distance)} miles from our nearest San Diego location (${location}). I can still help with travel-friendly weekend slots or a 10-minute virtual intro with Carlos.`,
+        quickReplies: getSmartReplies({
+          step: 'greeting',
+          entities: { ...entities, location, travelMode: 'visitor' },
+          memory,
+          recentMessages,
+          geoStatus: 'non-local',
+          fallback: ['Show weekend traveler slots', 'Book a virtual intro', "I'll be in San Diego soon"],
+        }),
+      });
+      return;
+    }
+
+    pushBot({
+      kind: 'text',
+      text: `Perfect — closest location looks like ${location}. I'll prioritize that schedule from here.`,
+    });
+  }, [entities, memory, pushBot, recentMessages]);
+
+  const requestPreciseLocation = useCallback(() => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      pushBot({
+        kind: 'quick-replies',
+        text: "This browser won't share location, but ZIP code works too. Drop your ZIP or pick the nearest area:",
+        quickReplies: ['92103', '92109', '91910'],
+      });
+      return;
+    }
+
+    setThinking(true);
+    navigator.geolocation.getCurrentPosition(
+      position => {
+        setThinking(false);
+        const nearest = nearestNeighborhood(position.coords.latitude, position.coords.longitude);
+        resolveLocationSignal(
+          nearest.neighborhood,
+          nearest.distance > 80 ? 'non-local' : 'shared',
+          nearest.distance
+        );
+      },
+      () => {
+        setThinking(false);
+        setGeoStatus('denied');
+        pushBot({
+          kind: 'quick-replies',
+          text: "No problem — if you'd rather not share precise location, give me a ZIP code or tap the nearest area.",
+          quickReplies: ['92103', '92109', '91910'],
+        });
+      },
+      { enableHighAccuracy: false, timeout: 7000, maximumAge: 600_000 }
+    );
+  }, [pushBot, resolveLocationSignal]);
 
   /* ─── Main send flow ─── */
   const send = (rawText: string) => {
@@ -550,12 +926,39 @@ export default function LiveBookingBot() {
 
     pushUser(text);
     setInput('');
+
+    if (/use my location/i.test(text)) {
+      requestPreciseLocation();
+      return;
+    }
+
+    if (/show weekend traveler slots/i.test(text)) {
+      const visitorEntities: Entities = { ...entities, travelMode: 'visitor', preferredDay: 'weekend' };
+      setEntities(visitorEntities);
+      pushBot({
+        kind: 'text',
+        text: "Travel-friendly mode on. I'll surface weekend slots first and keep the schedule tight.",
+      });
+      offerSlots(visitorEntities);
+      return;
+    }
+
+    if (/book a virtual intro/i.test(text)) {
+      const virtualEntities: Entities = { ...entities, travelMode: 'virtual' };
+      setEntities(virtualEntities);
+      triggerEscalation('Virtual intro requested by user.');
+      return;
+    }
+
+    const explicitZip = text.match(/\b(92\d{3})\b/);
+    if (explicitZip && ZIP_TO_NEIGHBORHOOD[explicitZip[1]]) {
+      resolveLocationSignal(ZIP_TO_NEIGHBORHOOD[explicitZip[1]], 'shared');
+      if (/^\s*92\d{3}\s*$/.test(text)) return;
+    }
+
     setThinking(true);
 
     const sentAt = performance.now();
-
-    // Detect same-message-twice (frustration signal)
-    const sameTwice = memory.lastUserMessage.toLowerCase() === text.toLowerCase();
 
     // Score intents + sentiment
     const intents = scoreIntents(text);
@@ -565,72 +968,24 @@ export default function LiveBookingBot() {
     // Extract entities
     const newEntities = extractEntities(text, entities);
     const gainedEntity = Object.keys(newEntities).length > Object.keys(entities).length;
+    const nextMemory = deriveNextMemory(memory, text, topIntent, gainedEntity);
+    const nextState = deriveNextState(state, topIntent);
 
-    // Update memory
-    setMemory(prev => {
-      const next: MemoryLayer = {
-        ...prev,
-        messageCount: prev.messageCount + 1,
-        lastUserMessage: text,
-        sameMessageTwice: sameTwice,
-        engagementScore: prev.engagementScore + (gainedEntity ? 12 : 5),
-      };
-      if (sameTwice) next.confidenceScore -= 0.3;
-      if (!topIntent || topIntent.confidence < 0.35) {
-        next.unclearCount += 1;
-        next.confidenceScore -= 0.15;
-      }
-      return next;
-    });
-
+    setMemory(nextMemory);
     setEntities(newEntities);
-
-    // Lead score update
-    setState(prev => {
-      let score = prev.leadScore;
-      if (topIntent) {
-        if (topIntent.intent.startsWith('action:book'))  score += 25;
-        if (topIntent.intent.startsWith('art:'))         score += 12;
-        if (topIntent.intent.startsWith('age:Kid'))      score += 15;
-        if (topIntent.intent.startsWith('exp:'))         score += 10;
-        if (topIntent.intent.startsWith('time:'))        score += 8;
-        if (topIntent.intent.startsWith('location:'))    score += 7;
-        if (topIntent.intent === 'greeting')             score += 3;
-        if (topIntent.intent === 'objection:price')      score -= 10;
-        if (topIntent.intent === 'objection:safety')     score -= 6;
-        if (topIntent.intent === 'objection:insurance')  score -= 8;
-      }
-      score = Math.max(0, Math.min(100, score));
-      const hotLead = score >= 70;
-      // Conversion mode shift
-      let mode: Mode = prev.mode;
-      if (score >= 80 || prev.messagesSent >= 8) mode = 'close';
-      else if (score >= 50) mode = 'assist';
-      else mode = 'explore';
-
-      return { ...prev, leadScore: score, hotLead, mode, messagesSent: prev.messagesSent + 1 };
-    });
-
-    // Objection tracking
-    if (topIntent?.intent.startsWith('objection:')) {
-      const objKey = topIntent.intent.split(':')[1] as ObjectionKey;
-      setMemory(prev => {
-        if (!prev.objections.includes(objKey)) {
-          return { ...prev, objections: [...prev.objections, objKey] };
-        }
-        // Repeated objection = strong escalation signal
-        return { ...prev, hesitations: prev.hesitations + 1 };
-      });
-    }
+    setState(nextState);
 
     // Compute typing delay using previous bot message
     const prevBot = [...messages].reverse().find(m => m.sender === 'bot');
-    const delay = calculateTypingDelay(prevBot?.text || '', 'text');
+    const delay = calculateTypingDelay(
+      prevBot?.text || '',
+      predictResponseKind(topIntent, sentiment, nextMemory, newEntities)
+    );
 
     window.setTimeout(() => {
       const responseMs = performance.now() - sentAt;
       setResponseTimes(r => [...r, responseMs]);
-      respond(text, topIntent, intents, sentiment, newEntities);
+      respond(text, topIntent, intents, sentiment, newEntities, nextMemory, nextState);
       setThinking(false);
     }, delay);
   };
@@ -641,49 +996,145 @@ export default function LiveBookingBot() {
     topIntent: { intent: string; confidence: number } | undefined,
     allIntents: { intent: string; confidence: number }[],
     sentiment: 'neg' | 'neu' | 'pos',
-    newEntities: Entities
+    newEntities: Entities,
+    currentMemory: MemoryLayer,
+    currentState: ConversationState
   ) => {
-    // Pull a *snapshot* of memory including this-turn updates
-    const currentMemory: MemoryLayer = {
-      ...memory,
-      objections: memory.objections,
-      lastUserMessage: userText,
-    };
-
     // Escalation checks FIRST
-    if (topIntent?.intent === 'escalate:human' || currentMemory.confidenceScore < 0.45 || currentMemory.objections.length >= 3 || currentMemory.unclearCount >= 2) {
-      triggerEscalation('The user needs a human — self-diagnosed low confidence or repeated objections.');
+    if (
+      topIntent?.intent === 'escalate:human'
+      || currentMemory.confidenceScore < 0.45
+      || currentMemory.objections.length >= 3
+      || currentMemory.unclearCount >= 2
+      || Object.values(currentMemory.objectionCounts).some(count => (count ?? 0) >= 2)
+    ) {
+      triggerEscalation(
+        'The user needs a human — self-diagnosed low confidence or repeated objections.',
+        { ents: newEntities, mem: currentMemory, convo: currentState }
+      );
+      return;
+    }
+
+    if (currentState.step === 'post-booking') {
+      handlePostBookingResponse(userText, currentState.bookedSlot);
+      return;
+    }
+
+    if (currentState.step === 'escalate' && /callback|call me|text is better|keep chatting/i.test(userText)) {
+      handleEscalationPreference(userText);
+      return;
+    }
+
+    if (
+      currentState.step === 'escalate'
+      && (newEntities.phone || newEntities.email)
+      && (newEntities.phone !== entities.phone || newEntities.email !== entities.email)
+    ) {
+      pushBot({
+        kind: 'text',
+        text: `Perfect — I pinned ${newEntities.phone || newEntities.email} to Carlos's handoff summary so he reaches out on the right channel.`,
+      });
+      return;
+    }
+
+    if (/show me slots/i.test(userText) && (newEntities.art || entities.art)) {
+      offerSlots({ ...entities, ...newEntities });
       return;
     }
 
     // Returning visitor quick paths
-    if (isReturning && /continue|yes/i.test(userText) && entities.art) {
+    if (isReturning && /continue|yes/i.test(userText) && (entities.art || newEntities.art)) {
+      const remembered = { ...entities, ...newEntities };
       pushBot({
         kind: 'text',
-        text: `Perfect — picking up where we left off. Based on what I remember (${entities.art}${entities.experience ? ', ' + entities.experience.toLowerCase() : ''}${entities.audienceType === 'parent' ? `, parent of a kid` : ''}), I've got ${matchSlots(entities, slots).length} tailored slots ready.`,
+        text: `Perfect — picking up where we left off. Based on what I remember (${remembered.art}${remembered.experience ? ', ' + remembered.experience.toLowerCase() : ''}${remembered.audienceType === 'parent' ? `, parent of a kid` : ''}), I've got ${matchSlots(remembered, slots).length} tailored slots ready.`,
       });
-      window.setTimeout(() => offerSlots(entities), 900);
+      window.setTimeout(() => offerSlots(remembered), 900);
       setIsReturning(false);
       return;
     }
 
+    const isMicroCommitmentReply =
+      (currentState.step === 'micro-day-pref' && /weekday|weekend|either/i.test(userText))
+      || (currentState.step === 'micro-time-pref' && /evening|morning|earlier|either/i.test(userText));
+
     // Low confidence / tied intents → clarification ladder
-    if (!topIntent || topIntent.confidence < 0.35) {
+    if ((!topIntent || topIntent.confidence < 0.35) && !isMicroCommitmentReply) {
       if (allIntents.length >= 2 && Math.abs(allIntents[0].confidence - allIntents[1].confidence) < 0.15) {
         const optA = allIntents[0].intent.split(':')[1] ?? allIntents[0].intent;
         const optB = allIntents[1].intent.split(':')[1] ?? allIntents[1].intent;
         pushBot({
           kind: 'clarify',
           text: `Got it — I want to make sure I help with the right thing. Is this more about ${optA}, or ${optB}?`,
-          quickReplies: [optA, optB, "Honestly, I'm just exploring"],
+          quickReplies: getSmartReplies({
+            step: currentState.step,
+            entities: newEntities,
+            memory: currentMemory,
+            recentMessages,
+            geoStatus,
+            fallback: [optA, optB, "Honestly, I'm just exploring"],
+          }),
         });
         return;
       }
       pushBot({
         kind: 'clarify',
         text: "Totally fair — let me make it simpler. Pick one and I'll take it from there:",
-        quickReplies: ['Book a BJJ trial', 'Kids martial arts', 'Just want info', 'Talk to a human'],
+        quickReplies: getSmartReplies({
+          step: currentState.step,
+          entities: newEntities,
+          memory: currentMemory,
+          recentMessages,
+          geoStatus,
+          fallback: ['Book a BJJ trial', 'Kids martial arts', 'Just want info', 'Talk to a human'],
+        }),
       });
+      return;
+    }
+
+    if (!topIntent && currentState.step === 'micro-day-pref' && /weekday|weekend|either/i.test(userText)) {
+      const preferredDay: Entities['preferredDay'] = /weekend/i.test(userText)
+        ? 'weekend'
+        : /weekday/i.test(userText)
+          ? 'weekday'
+          : 'either';
+      const updatedEntities = { ...newEntities, preferredDay };
+      setEntities(updatedEntities);
+      pushBot({
+        kind: 'quick-replies',
+        text: 'Got it. Evening or earlier in the day?',
+        quickReplies: getSmartReplies({
+          step: 'micro-time-pref',
+          entities: updatedEntities,
+          memory: currentMemory,
+          recentMessages,
+          geoStatus,
+          fallback: ['Evening after 5', 'Morning / earlier', 'Either'],
+        }),
+      });
+      setState(prev => ({ ...prev, step: 'micro-time-pref' }));
+      return;
+    }
+
+    if (!topIntent && currentState.step === 'micro-time-pref' && /evening|morning|earlier|either/i.test(userText)) {
+      const preferredTime: Entities['preferredTime'] = /evening/i.test(userText)
+        ? 'evening'
+        : /morning|earlier/i.test(userText)
+          ? 'morning'
+          : undefined;
+      const updatedEntities = preferredTime ? { ...newEntities, preferredTime } : newEntities;
+      if (preferredTime) setEntities(updatedEntities);
+      pushBot({
+        kind: 'text',
+        text: `${preferredTime === 'evening' ? 'Evenings' : preferredTime === 'morning' ? 'Earlier sessions' : 'Flexible timing'} — noted. Pulling matching slots now…`,
+      });
+      window.setTimeout(() => offerSlots(updatedEntities), 900);
+      return;
+    }
+
+    if (!topIntent) {
+      const nextMove = bestNextMove(currentState, newEntities, currentMemory);
+      executeNextMove(nextMove, newEntities, currentMemory, currentState);
       return;
     }
 
@@ -692,6 +1143,13 @@ export default function LiveBookingBot() {
       pushBot({
         kind: 'empathy',
         text: `Totally hear you — everyone feels a bit of that at first. Let me answer directly, no sales pitch.`,
+      });
+    }
+
+    if (currentState.hotLead && !state.hotLead && !currentState.humanShadowActive) {
+      pushBot({
+        kind: 'text',
+        text: "You're moving fast, so I'm quietly pulling Carlos into the background in case you want a 30-second callback after this.",
       });
     }
 
@@ -705,7 +1163,7 @@ export default function LiveBookingBot() {
       return;
     }
     if (topIntent.intent === 'objection:wear') {
-      handleWearObjection();
+      handleWearObjection(sentiment === 'neg');
       return;
     }
     if (topIntent.intent === 'objection:time') {
@@ -744,7 +1202,14 @@ export default function LiveBookingBot() {
       pushBot({
         kind: 'quick-replies',
         text: '',
-        quickReplies: ['Total beginner', 'Some experience', 'Been training a while'],
+        quickReplies: getSmartReplies({
+          step: 'qualify-exp',
+          entities: { ...newEntities, art },
+          memory: currentMemory,
+          recentMessages,
+          geoStatus,
+          fallback: ['Total beginner', 'Some experience', 'Been training a while'],
+        }),
       });
       setState(prev => ({ ...prev, step: 'qualify-exp' }));
       return;
@@ -782,6 +1247,21 @@ export default function LiveBookingBot() {
 
     // Action: book
     if (topIntent.intent === 'action:book') {
+      if (geoStatus === 'non-local' && !newEntities.location) {
+        pushBot({
+          kind: 'quick-replies',
+          text: "If you're not in San Diego yet, I can do this two ways: travel-friendly weekend slots or a quick virtual intro first.",
+          quickReplies: getSmartReplies({
+            step: currentState.step,
+            entities: { ...newEntities, travelMode: 'visitor' },
+            memory: currentMemory,
+            recentMessages,
+            geoStatus,
+            fallback: ['Show weekend traveler slots', 'Book a virtual intro', 'Use my location'],
+          }),
+        });
+        return;
+      }
       // Skip redundant questions if we already know
       if (newEntities.art && newEntities.experience) {
         offerSlots(newEntities);
@@ -792,7 +1272,14 @@ export default function LiveBookingBot() {
         pushBot({
           kind: 'quick-replies',
           text: `Let's do it. Quick — what's your experience with ${newEntities.art}?`,
-          quickReplies: ['Total beginner', 'Some experience', 'Been training a while'],
+          quickReplies: getSmartReplies({
+            step: 'qualify-exp',
+            entities: newEntities,
+            memory: currentMemory,
+            recentMessages,
+            geoStatus,
+            fallback: ['Total beginner', 'Some experience', 'Been training a while'],
+          }),
         });
         setState(prev => ({ ...prev, step: 'qualify-exp' }));
         return;
@@ -801,20 +1288,74 @@ export default function LiveBookingBot() {
       pushBot({
         kind: 'quick-replies',
         text: `Let's do it. Quick question first — are you looking for weekdays or weekends?`,
-        quickReplies: ['Weekdays', 'Weekends', 'Either works'],
+        quickReplies: getSmartReplies({
+          step: 'micro-day-pref',
+          entities: newEntities,
+          memory: currentMemory,
+          recentMessages,
+          geoStatus,
+          fallback: ['Weekdays', 'Weekends', 'Either works'],
+        }),
       });
       setState(prev => ({ ...prev, step: 'micro-day-pref' }));
+      return;
+    }
+
+    if (currentState.step === 'micro-day-pref' && /weekday|weekend|either/i.test(userText)) {
+      const preferredDay: Entities['preferredDay'] = /weekend/i.test(userText)
+        ? 'weekend'
+        : /weekday/i.test(userText)
+          ? 'weekday'
+          : 'either';
+      const updatedEntities = { ...newEntities, preferredDay };
+      setEntities(updatedEntities);
+      pushBot({
+        kind: 'quick-replies',
+        text: 'Got it. Evening or earlier in the day?',
+        quickReplies: getSmartReplies({
+          step: 'micro-time-pref',
+          entities: updatedEntities,
+          memory: currentMemory,
+          recentMessages,
+          geoStatus,
+          fallback: ['Evening after 5', 'Morning / earlier', 'Either'],
+        }),
+      });
+      setState(prev => ({ ...prev, step: 'micro-time-pref' }));
+      return;
+    }
+
+    if (currentState.step === 'micro-time-pref' && /evening|morning|earlier|either/i.test(userText)) {
+      const preferredTime: Entities['preferredTime'] = /evening/i.test(userText)
+        ? 'evening'
+        : /morning|earlier/i.test(userText)
+          ? 'morning'
+          : undefined;
+      const updatedEntities = preferredTime ? { ...newEntities, preferredTime } : newEntities;
+      if (preferredTime) setEntities(updatedEntities);
+      pushBot({
+        kind: 'text',
+        text: `${preferredTime === 'evening' ? 'Evenings' : preferredTime === 'morning' ? 'Earlier sessions' : 'Flexible timing'} — noted. Pulling matching slots now…`,
+      });
+      window.setTimeout(() => offerSlots(updatedEntities), 900);
       return;
     }
 
     // Time preferences from micro-commitment funnel
     if (topIntent.intent.startsWith('time:')) {
       const pref = topIntent.intent.split(':')[1] as Entities['preferredTime'];
-      if (state.step === 'micro-day-pref') {
+      if (currentState.step === 'micro-day-pref') {
         pushBot({
           kind: 'quick-replies',
           text: 'Got it. Evening or earlier in the day?',
-          quickReplies: ['Evening after 5', 'Morning / earlier', 'Either'],
+          quickReplies: getSmartReplies({
+            step: 'micro-time-pref',
+            entities: newEntities,
+            memory: currentMemory,
+            recentMessages,
+            geoStatus,
+            fallback: ['Evening after 5', 'Morning / earlier', 'Either'],
+          }),
         });
         setState(prev => ({ ...prev, step: 'micro-time-pref' }));
         return;
@@ -840,13 +1381,21 @@ export default function LiveBookingBot() {
       pushBot({
         kind: 'quick-replies',
         text: `Welcome! ${currentMemory.messageCount > 0 ? 'Still here for you' : 'What brings you in today?'}`,
-        quickReplies: ['Adult trial', 'Kid trial', 'Just browsing'],
+        quickReplies: getSmartReplies({
+          step: 'greeting',
+          entities: newEntities,
+          memory: currentMemory,
+          recentMessages,
+          geoStatus,
+          fallback: ['Adult trial', 'Kid trial', 'Just browsing'],
+        }),
       });
       return;
     }
 
     // Location hint
     if (topIntent.intent === 'location:hint' && newEntities.location) {
+      setGeoStatus('shared');
       pushBot({
         kind: 'text',
         text: `${newEntities.location} — we have a location right there. Pulling the closest slots for you now…`,
@@ -856,17 +1405,19 @@ export default function LiveBookingBot() {
     }
 
     // Default: use best next move
-    const nextMove = bestNextMove(state, newEntities, currentMemory);
-    executeNextMove(nextMove, newEntities);
+    const nextMove = bestNextMove(currentState, newEntities, currentMemory);
+    executeNextMove(nextMove, newEntities, currentMemory, currentState);
   };
 
   const executeNextMove = (
     move: ReturnType<typeof bestNextMove>,
-    ents: Entities
+    ents: Entities,
+    decisionMemory: MemoryLayer,
+    decisionState: ConversationState
   ) => {
     switch (move) {
       case 'escalate':
-        triggerEscalation('Best-move recommender chose escalation.');
+        triggerEscalation('Best-move recommender chose escalation.', { ents, mem: decisionMemory, convo: decisionState });
         return;
       case 'offer-slots':
         offerSlots(ents);
@@ -875,33 +1426,56 @@ export default function LiveBookingBot() {
         pushBot({
           kind: 'quick-replies',
           text: "You sound ready. Let's lock in your trial — spots fill fast at this hour.",
-          quickReplies: ['Show me slots', 'One more question', 'Book the first available'],
+          quickReplies: getSmartReplies({
+            step: decisionState.step,
+            entities: ents,
+            memory: decisionMemory,
+            recentMessages,
+            geoStatus,
+            fallback: ['Show me slots', 'One more question', 'Book the first available'],
+          }),
         });
         return;
       case 'preempt': {
-        const next = predictNextObjection(ents, currentMemoryObjections());
+        const next = predictNextObjection(ents, decisionMemory.objections);
         if (next) {
           injectMicroproof(next);
           setState(prev => ({ ...prev, preemptedObjections: [...prev.preemptedObjections, next] }));
         } else {
-          pushBot({ kind: 'quick-replies', text: 'Want me to pull up open trial slots?', quickReplies: ['Yes, show slots', 'Tell me about classes first'] });
+          pushBot({
+            kind: 'quick-replies',
+            text: 'Want me to pull up open trial slots?',
+            quickReplies: getSmartReplies({
+              step: decisionState.step,
+              entities: ents,
+              memory: decisionMemory,
+              recentMessages,
+              geoStatus,
+              fallback: ['Yes, show slots', 'Tell me about classes first'],
+            }),
+          });
         }
         return;
       }
       case 'microproof':
-        injectMicroproof(memory.objections[memory.objections.length - 1] || 'price');
+        injectMicroproof(decisionMemory.objections[decisionMemory.objections.length - 1] || 'price');
         return;
       case 'qualify':
       default:
         pushBot({
           kind: 'quick-replies',
           text: "Want me to walk you through options or go straight to booking a trial?",
-          quickReplies: ['Walk me through', 'Book a trial', 'Just browsing'],
+          quickReplies: getSmartReplies({
+            step: decisionState.step,
+            entities: ents,
+            memory: decisionMemory,
+            recentMessages,
+            geoStatus,
+            fallback: ['Walk me through', 'Book a trial', 'Just browsing'],
+          }),
         });
     }
   };
-
-  const currentMemoryObjections = () => memory.objections;
 
   /* ─── Specific handlers ─── */
 
@@ -921,7 +1495,7 @@ export default function LiveBookingBot() {
     window.setTimeout(() => injectMicroproof(ents.audienceType === 'parent' ? 'kid-safety' : 'safety', ents), 900);
   };
 
-  const handleWearObjection = () => {
+  const handleWearObjection = (softenCta = false) => {
     pushBot({
       kind: 'text',
       text: "BJJ: gi (we have loaners) or rashguard + grappling shorts. Muay Thai: athletic shorts + t-shirt. Karate: loose clothes. Water + towel. First-timers show up in whatever — we don't judge.",
@@ -929,8 +1503,10 @@ export default function LiveBookingBot() {
     window.setTimeout(() => {
       pushBot({
         kind: 'quick-replies',
-        text: "Want to lock in a trial?",
-        quickReplies: ['Yes, book me in', "What's the schedule?"],
+        text: softenCta ? 'Want the simple version or the schedule next?' : "Want to lock in a trial?",
+        quickReplies: softenCta
+          ? ['Show me the schedule', 'One more question']
+          : ['Yes, book me in', "What's the schedule?"],
       });
     }, 900);
   };
@@ -943,9 +1519,16 @@ export default function LiveBookingBot() {
     pushBot({
       kind: 'quick-replies',
       text: '',
-      quickReplies: ['Early mornings', 'Evenings after work', 'Weekends only'],
+      quickReplies: getSmartReplies({
+        step: 'micro-time-pref',
+        entities,
+        memory,
+        recentMessages,
+        geoStatus,
+        fallback: ['Early mornings', 'Evenings after work', 'Weekends only'],
+      }),
     });
-    setState(prev => ({ ...prev, step: 'micro-day-pref' }));
+    setState(prev => ({ ...prev, step: 'micro-time-pref' }));
   };
 
   const injectMicroproof = (kind: ObjectionKey | 'price' | 'kid-safety' | 'safety', _ents?: Entities) => {
@@ -964,6 +1547,69 @@ export default function LiveBookingBot() {
     });
   };
 
+  const handleEscalationPreference = (userText: string) => {
+    if (/callback|call me/i.test(userText)) {
+      pushBot({
+        kind: 'text',
+        text: `Perfect — Carlos will prioritize a callback. ${entities.phone ? `He has ${entities.phone} on file.` : 'If you drop your number here, I’ll attach it to the handoff immediately.'}`,
+      });
+      return;
+    }
+
+    if (/text is better/i.test(userText)) {
+      pushBot({
+        kind: 'text',
+        text: `Text it is. ${entities.phone ? `Carlos will use ${entities.phone}.` : 'Drop your best mobile number and I’ll pin it to the thread.'}`,
+      });
+      return;
+    }
+
+    pushBot({
+      kind: 'text',
+      text: "No problem — I'll keep the context warm here until Carlos jumps in.",
+    });
+  };
+
+  const handlePostBookingResponse = (userText: string, slot?: ScheduleSlot) => {
+    if (/warm-up video/i.test(userText)) {
+      pushBot({
+        kind: 'text',
+        text: `Queued. Demo SMS:\n“Your ${slot?.art ?? 'trial'} warm-up video is ready: pcmadojo.com/warmup/${(slot?.art ?? 'intro').toLowerCase().replace(/\s+/g, '-')}. 3 minutes, no equipment.”`,
+      });
+      return;
+    }
+
+    if (/parking pdf/i.test(userText)) {
+      pushBot({
+        kind: 'text',
+        text: `Queued. Demo SMS:\n“Parking guide for ${slot?.location ?? 'your class'}: pcmadojo.com/parking/${(slot?.location ?? 'north-park').toLowerCase().replace(/\s+/g, '-')}. Best lot + side-street backup included.”`,
+      });
+      return;
+    }
+
+    if (/add a friend/i.test(userText)) {
+      pushBot({
+        kind: 'quick-replies',
+        text: "Nice. I can note a free +1 on the booking. Who are they likely to be?",
+        quickReplies: ['Friend from work', 'My partner', 'My kid', 'Not sure yet'],
+      });
+      return;
+    }
+
+    if (/friend from work|my partner|my kid|not sure yet/i.test(userText)) {
+      pushBot({
+        kind: 'text',
+        text: "Done — I added a referral flag to the booking so the front desk expects a +1 if they come.",
+      });
+      return;
+    }
+
+    pushBot({
+      kind: 'text',
+      text: `Perfect. Your ${slot?.day ?? 'upcoming'} class is locked and the nurture sequence stays live if you need anything before you hit the mat.`,
+    });
+  };
+
   /* ─── Slots ─── */
   const offerSlotsDelayed = (ents: Entities, ms: number) => {
     window.setTimeout(() => offerSlots(ents), ms);
@@ -979,9 +1625,10 @@ export default function LiveBookingBot() {
       triggerEscalation('No slots matched user profile — soft handoff.');
       return;
     }
+    setLastOfferedSlots(matched);
     pushBot({
       kind: 'schedule',
-      text: `Here are ${matched.length} slots tailored to you${ents.location ? ` (${ents.location} first)` : ''}. Tap one to lock it in:`,
+      text: `Here are ${matched.length} slots tailored to you${ents.location ? ` (${ents.location} first)` : ''}${ents.travelMode === 'visitor' ? ' with travel-friendly timing up top' : ''}. Tap one to lock it in:`,
       scheduleSlots: matched,
     });
     setState(prev => ({ ...prev, step: 'schedule' }));
@@ -991,7 +1638,12 @@ export default function LiveBookingBot() {
     // Decrement capacity
     setSlots(prev => prev.map(s => s.id === slot.id ? { ...s, spotsLeft: Math.max(0, s.spotsLeft - 1) } : s));
 
-    const tldr = buildHandoffSummary({ ...entities }, memory, slot);
+    const tldr = buildHandoffSummary(
+      { ...entities },
+      memory,
+      slot,
+      { ...state, bookedSlot: slot, leadScore: 100, hotLead: true, step: 'post-booking' }
+    );
 
     pushBot({
       kind: 'confirmation',
@@ -999,30 +1651,50 @@ export default function LiveBookingBot() {
       tldr,
     });
 
-    setState(prev => ({ ...prev, bookedSlot: slot, step: 'post-booking', leadScore: 100 }));
+    setState(prev => ({ ...prev, bookedSlot: slot, step: 'post-booking', leadScore: 100, hotLead: true }));
 
     // Post-booking micro-commitment nurture loop
     window.setTimeout(() => {
       pushBot({
         kind: 'post-booking',
         text: `Quick one — while you wait for class, want me to send you a 60-second ${slot.art} warm-up video + a PDF with parking hacks for ${slot.location}?`,
-        quickReplies: [
-          '📹 Yes, send warm-up video',
-          '🅿️ Send parking PDF',
-          '👯 Add a friend for free',
-          "I'm good for now",
-        ],
+        quickReplies: getSmartReplies({
+          step: 'post-booking',
+          entities,
+          memory,
+          recentMessages,
+          geoStatus,
+          fallback: ['📹 Yes, send warm-up video', '🅿️ Send parking PDF', '👯 Add a friend for free', "I'm good for now"],
+        }),
       });
     }, 1600);
   };
 
   /* ─── Escalation + Human Shadow Mode ─── */
-  const triggerEscalation = (internalReason: string) => {
-    const tldr = buildHandoffSummary(entities, memory, state.bookedSlot);
+  const triggerEscalation = (
+    internalReason: string,
+    overrides?: { ents?: Entities; mem?: MemoryLayer; convo?: ConversationState }
+  ) => {
+    const summaryEntities = overrides?.ents ?? entities;
+    const summaryMemory = overrides?.mem ?? memory;
+    const summaryState = overrides?.convo ?? state;
+    const tldr = buildHandoffSummary(summaryEntities, summaryMemory, summaryState.bookedSlot, summaryState);
     pushBot({
       kind: 'escalation',
-      text: `Flagging this for Carlos (head instructor). No bots — a human will text you within the hour. In the meantime, I'll stay here if you need anything else.`,
+      text: `Flagging this for Carlos (head instructor). No bots — a human will text you within the hour. If you'd rather get a callback, I can pin that to the thread right now.`,
       tldr,
+    });
+    pushBot({
+      kind: 'quick-replies',
+      text: 'Best next move?',
+      quickReplies: getSmartReplies({
+        step: 'escalate',
+        entities: summaryEntities,
+        memory: summaryMemory,
+        recentMessages,
+        geoStatus,
+        fallback: ['Yes, request callback', 'Text is better', 'Keep chatting here'],
+      }),
     });
     setState(prev => ({ ...prev, step: 'escalate', humanShadowActive: true }));
 
@@ -1047,7 +1719,12 @@ export default function LiveBookingBot() {
     if (internalReason) { /* reason captured in handoff summary, linter-friendly */ }
   };
 
-  const buildHandoffSummary = (ents: Entities, mem: MemoryLayer, slot?: ScheduleSlot): string => {
+  const buildHandoffSummary = (
+    ents: Entities,
+    mem: MemoryLayer,
+    slot?: ScheduleSlot,
+    convo: ConversationState = state
+  ): string => {
     const parts: string[] = [];
     if (ents.name) parts.push(ents.name);
     if (ents.audienceType === 'parent') parts.push(`parent of ${ents.kidName ? ents.kidName : 'a kid'}${ents.kidAge ? ` (${ents.kidAge})` : ''}`);
@@ -1056,9 +1733,12 @@ export default function LiveBookingBot() {
     if (ents.experience) parts.push(`${ents.experience.toLowerCase()} level`);
     if (mem.objections.length) parts.push(`concerned about ${mem.objections.join(', ')}`);
     if (ents.location) parts.push(`${ents.location} preferred`);
+    if (ents.zipCode) parts.push(`ZIP ${ents.zipCode}`);
+    if (ents.phone) parts.push(`phone ${ents.phone}`);
+    if (ents.email) parts.push(`email ${ents.email}`);
     if (slot) parts.push(`BOOKED ${slot.day} ${slot.time} ${slot.label} ${slot.location}`);
     const who = parts.length ? parts.join(', ') : 'new lead (minimal profile)';
-    return `TL;DR: ${who}. Score ${state.leadScore}/100. ${mem.hesitations > 0 ? 'Showed hesitation. ' : ''}${state.hotLead ? '🔥 HOT LEAD' : ''}`;
+    return `TL;DR: ${who}. Score ${convo.leadScore}/100. ${mem.hesitations > 0 ? 'Showed hesitation. ' : ''}${convo.hotLead ? '🔥 HOT LEAD' : ''}`;
   };
 
   /* ─── Reset ─── */
@@ -1071,8 +1751,11 @@ export default function LiveBookingBot() {
     setResponseTimes([]);
     setShowSuggestions(true);
     setIsReturning(false);
+    setGeoStatus('unknown');
+    setLastOfferedSlots([]);
     setSlots(BASE_SLOTS);
     nextId.current = 1;
+    sessionIdRef.current = `local-${Math.random().toString(36).slice(2, 8)}`;
     bootedRef.current = false;
     window.setTimeout(() => {
       pushBot({
@@ -1090,6 +1773,8 @@ export default function LiveBookingBot() {
     : 0;
 
   const frontDeskMin = clock.frontDeskOpen ? 0 : clock.minutesUntilFrontDeskOpen;
+  const frontDeskBaselineMs = getFrontDeskBaselineMs(clock);
+  const responseChartMax = Math.max(frontDeskBaselineMs || 720000, 720000);
   const currentModeLabel = state.mode === 'close' ? 'CLOSE' : state.mode === 'assist' ? 'ASSIST' : 'EXPLORE';
   const modeColor = state.mode === 'close' ? '#22c55e' : state.mode === 'assist' ? '#d4a017' : '#60a5fa';
 
@@ -1157,7 +1842,7 @@ export default function LiveBookingBot() {
         <div className="px-6 py-3 bg-gradient-to-r from-dojo-red/5 via-transparent to-dojo-gold/5 border-b border-white/5 flex items-center justify-between text-[10px] font-mono uppercase tracking-widest flex-wrap gap-2">
           <span className="text-dojo-red">
             ✕ Front desk: {clock.frontDeskOpen
-              ? `Open (closes ${clock.weekdayIdx === 6 ? '4 PM' : '8 PM'})`
+              ? `Open · honest baseline ${(frontDeskBaselineMs / 60000).toFixed(0)} min`
               : `CLOSED · reopens in ${minutesToHuman(frontDeskMin)}`}
           </span>
           <span className="text-gray-600">vs</span>
@@ -1224,16 +1909,16 @@ export default function LiveBookingBot() {
                 ⚡ Honest Response Time
               </div>
               <div className="space-y-2.5">
-                <TimeBar label="MatBoss bot" ms={avgResponseMs || 800} max={Math.max(frontDeskMin * 60_000 || 720000, 720000)} color="#d4a017" />
+                <TimeBar label="MatBoss bot" ms={avgResponseMs || 800} max={responseChartMax} color="#d4a017" />
                 <TimeBar
-                  label={clock.frontDeskOpen ? 'Front desk (avg)' : `Front desk (CLOSED)`}
-                  ms={clock.frontDeskOpen ? 180_000 : frontDeskMin * 60_000}
-                  max={Math.max(frontDeskMin * 60_000 || 720000, 720000)}
+                  label={clock.frontDeskOpen ? 'Front desk (honest baseline)' : `Front desk (CLOSED)`}
+                  ms={frontDeskBaselineMs}
+                  max={responseChartMax}
                   color="#dc2626"
                 />
                 {!clock.frontDeskOpen && (
                   <div className="text-[9px] font-mono text-dojo-red bg-dojo-red/10 border border-dojo-red/20 rounded p-2 leading-relaxed">
-                    It's {clock.clock12.replace(/:\d\d (AM|PM)$/, ' $1')} {clock.tzLabel}. Your competitors' front desks reopen in {minutesToHuman(frontDeskMin)}. This bot just answered in under 2 seconds.
+                    It's {clock.clock12.replace(/:\d\d (AM|PM)$/, ' $1')} {clock.tzLabel}. Your competitors' front desks reopen in {minutesToHuman(frontDeskMin)}. This bot just answered in {avgResponseMs > 0 ? `${(avgResponseMs / 1000).toFixed(2)}s` : 'under 2 seconds'}.
                   </div>
                 )}
               </div>
@@ -1251,7 +1936,9 @@ export default function LiveBookingBot() {
                 <StatRow label="Art" value={entities.art || '—'} />
                 <StatRow label="Experience" value={entities.experience || '—'} />
                 <StatRow label="Location" value={entities.location || '—'} />
+                <StatRow label="Geo" value={geoStatus} />
                 <StatRow label="Time pref" value={entities.preferredTime || '—'} />
+                <StatRow label="Contact" value={entities.phone || entities.email || '—'} />
               </div>
             </div>
 

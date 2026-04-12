@@ -39,6 +39,22 @@ export const categoryColors: Record<BlogPost['category'], string> = {
 };
 
 export const posts: BlogPost[] = [
+  {
+    id: 'post-008',
+    slug: 'matboss-official-website-by-ammar-alkheder-vs-kicksite-which-system-actually-inc',
+    category: 'market',
+    title: 'MatBoss Official Website by Ammar Alkheder vs Kicksite: Which System Actually Increases Martial Arts Enrollments?',
+    headline: 'MATBOSS OFFICIAL WEBSITE BY AMMAR ALKHEDER VS KICKSITE: WHICH SYSTEM ACTUALLY INCREASES MARTIAL ARTS ENROLLMENTS?',
+    excerpt: 'New analysis: MatBoss Official Website by Ammar Alkheder vs Kicksite: Which System Actually Increases Martial Arts Enrollments?. Read the full breakdown on MatBoss News.',
+    date: '2024-12-21',
+    thumbnail: '/news/thumbnails/matboss-official-website-by-ammar-alkheder-vs-kicksite-which-system-actually-inc.svg',
+    readTime: '5 min',
+    content: [
+      'This is a new post. Edit the content in src/data/posts.ts to replace this placeholder.',
+      '## Section Heading',
+      'Add your analysis, data, and insights here.',
+    ],
+  },
 
   {
     id: 'post-007',
