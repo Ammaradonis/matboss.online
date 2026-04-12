@@ -1,6 +1,7 @@
 import type { Context } from '@netlify/functions';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { blogCategories, type BlogPost } from '../../src/data/posts';
+import { blockObjectToLines } from '../../src/lib/contentParser';
 import { getDatabaseErrorCode, loadMergedBlogPosts, saveBlogPost } from './blog-store';
 
 const JSON_HEADERS = {
@@ -112,10 +113,16 @@ function normalizeThumbnail(value: unknown): string | null {
 
 function normalizeContent(value: unknown): string[] | null {
   if (Array.isArray(value)) {
-    const normalized = value
-      .filter((item): item is string => typeof item === 'string')
-      .map((item) => item.trim())
-      .filter(Boolean);
+    const normalized: string[] = [];
+
+    for (const item of value) {
+      if (typeof item === 'string') {
+        const trimmed = item.trim();
+        if (trimmed) normalized.push(trimmed);
+      } else if (typeof item === 'object' && item !== null && 'type' in item) {
+        normalized.push(...blockObjectToLines(item as Record<string, unknown>));
+      }
+    }
 
     return normalized.length > 0 ? normalized : null;
   }

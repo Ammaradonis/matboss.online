@@ -1,5 +1,6 @@
 import pool from './db';
 import { mergePosts, posts as staticPosts, type BlogPost } from '../../src/data/posts';
+import { blockObjectToLines } from '../../src/lib/contentParser';
 
 export const SITE_URL = 'https://matboss.online';
 export const BLOG_PUBLICATION_NAME = 'MatBoss';
@@ -120,9 +121,17 @@ function toPublishedDate(value: unknown): string {
 }
 
 export function mapRowToStoredPost(row: Record<string, unknown>): StoredBlogPost {
-  const content = Array.isArray(row.content)
-    ? row.content.filter((item): item is string => typeof item === 'string')
-    : [];
+  const content: string[] = [];
+
+  if (Array.isArray(row.content)) {
+    for (const item of row.content) {
+      if (typeof item === 'string') {
+        content.push(item);
+      } else if (typeof item === 'object' && item !== null && 'type' in item) {
+        content.push(...blockObjectToLines(item as Record<string, unknown>));
+      }
+    }
+  }
 
   return {
     id: String(row.id),

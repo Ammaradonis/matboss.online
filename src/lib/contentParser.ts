@@ -23,6 +23,54 @@ export type Block =
   | { type: 'table'; headers: string[]; rows: string[][] }
   | { type: 'hr' };
 
+// ---- Structured-block → markdown-string conversion -------------------------
+//
+// When the API receives content as pre-parsed block objects (e.g. {type:"h2", text:"..."}),
+// this converts each block to markdown-style strings so the string-based parser can handle
+// them uniformly.
+
+export function blockObjectToLines(obj: Record<string, unknown>): string[] {
+  const blockType = obj.type;
+  if (typeof blockType !== 'string') return [];
+
+  switch (blockType) {
+    case 'h2':
+      return typeof obj.text === 'string' ? [`## ${obj.text}`] : [];
+    case 'h3':
+      return typeof obj.text === 'string' ? [`### ${obj.text}`] : [];
+    case 'p':
+      return typeof obj.text === 'string' ? [obj.text] : [];
+    case 'blockquote':
+      return typeof obj.text === 'string' ? [`> ${obj.text}`] : [];
+    case 'ul':
+      return Array.isArray(obj.items)
+        ? obj.items.filter((i: unknown): i is string => typeof i === 'string').map((item) => `- ${item}`)
+        : [];
+    case 'ol':
+      return Array.isArray(obj.items)
+        ? obj.items.filter((i: unknown): i is string => typeof i === 'string').map((item, idx) => `${idx + 1}. ${item}`)
+        : [];
+    case 'table': {
+      if (!Array.isArray(obj.headers) || !Array.isArray(obj.rows)) return [];
+      const headers = obj.headers.filter((h: unknown): h is string => typeof h === 'string');
+      if (headers.length === 0) return [];
+      const lines: string[] = [];
+      lines.push(`| ${headers.join(' | ')} |`);
+      lines.push(`| ${headers.map(() => '---').join(' | ')} |`);
+      for (const row of obj.rows) {
+        if (Array.isArray(row)) {
+          lines.push(`| ${row.filter((c: unknown): c is string => typeof c === 'string').join(' | ')} |`);
+        }
+      }
+      return lines;
+    }
+    case 'hr':
+      return ['---'];
+    default:
+      return typeof obj.text === 'string' ? [obj.text] : [];
+  }
+}
+
 // ---- Line classification --------------------------------------------------
 
 const enum LineKind {
