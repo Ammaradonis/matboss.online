@@ -731,8 +731,8 @@ export default function LiveBookingBot() {
       const lastVisit = new Date(profile.lastVisit);
       const hoursAgo = Math.round((Date.now() - lastVisit.getTime()) / (1000 * 60 * 60));
       const welcomeText = profile.entities.name
-        ? `Welcome back, ${profile.entities.name}! 👋 I remember you ${hoursAgo < 1 ? 'just' : hoursAgo < 24 ? `${hoursAgo}h ago` : 'last time'}${profile.entities.art ? ` — you were looking into ${profile.entities.art}` : ''}${profile.entities.experience ? ` as a ${profile.entities.experience.toLowerCase()}` : ''}. Want to pick up where we left off?`
-        : `Welcome back! 👋 I remember our last chat${profile.entities.art ? ` — you were looking into ${profile.entities.art}` : ''}. Want to pick up where we left off?`;
+        ? `🔥🔥🔥 NO WAY — ${profile.entities.name} is BACK! 👊💥 I literally remember you ${hoursAgo < 1 ? 'just now' : hoursAgo < 24 ? `from ${hoursAgo}h ago` : 'from last time'}${profile.entities.art ? ` — you were vibing on ${profile.entities.art}` : ''}${profile.entities.experience ? ` as a total ${profile.entities.experience.toLowerCase()} warrior` : ''}! 🥋✨ The mat's been waiting for you! Ready to pick up where we left off and make this HAPPEN? 💪🔥`
+        : `🔥 WELCOME BACK, legend!! 👋💥 I remember our last chat${profile.entities.art ? ` — you were eyeing ${profile.entities.art} and I could FEEL the energy` : ''}! 🥋✨ The universe brought you back for a reason — ready to pick up where we left off? Let's GO! 🚀💪`;
 
       window.setTimeout(() => {
         pushBot({
@@ -753,7 +753,7 @@ export default function LiveBookingBot() {
       window.setTimeout(() => {
         pushBot({
           kind: 'quick-replies',
-          text: `Hey there 👊 Welcome to Pacific Coast Martial Arts. I'm the MatBoss booking engine — trained on every San Diego dojo question. It's currently ${clock.clock12.replace(/:\d\d (AM|PM)$/, ' $1')} ${clock.tzLabel} here at the dojo.${appearsLocal ? '' : ` It looks like you may be outside San Diego, so I can also show travel-friendly or virtual options.`} What brings you in today?`,
+          text: `👊💥 YOOO what's good!! Welcome to Pacific Coast Martial Arts — San Diego's ABSOLUTE FINEST! 🏆🔥 I'm the MatBoss booking engine, trained on every single dojo question known to mankind! 🧠💪 It's ${clock.clock12.replace(/:\d\d (AM|PM)$/, ' $1')} ${clock.tzLabel} right now at the dojo and the energy is ELECTRIC! ⚡${appearsLocal ? '' : ` 🌍 Looks like you might be joining us from outside San Diego — no worries, I've got travel-friendly AND virtual options that'll BLOW YOUR MIND! ✈️🎯`} So tell me — what brought the FUTURE WARRIOR to our door today?! 🥋🔥✨`,
           quickReplies: getSmartReplies({
             step: 'greeting',
             entities: {},
@@ -845,7 +845,7 @@ export default function LiveBookingBot() {
     if (distance && distance > 80) {
       pushBot({
         kind: 'quick-replies',
-        text: `Looks like you're about ${Math.round(distance)} miles from our nearest San Diego location (${location}). I can still help with travel-friendly weekend slots or a 10-minute virtual intro with Carlos.`,
+        text: `🌍✈️ Whoa — you're about ${Math.round(distance)} miles from our nearest San Diego location (${location})! But distance is NOTHING when the warrior spirit calls! 🔥💪 I've got travel-friendly weekend slots that'll work PERFECTLY or a killer 10-minute virtual intro with Carlos himself! 🎯⚡ Let's make this happen no matter WHERE you are! 🚀`,
         quickReplies: getSmartReplies({
           step: 'greeting',
           entities: { ...entities, location, travelMode: 'visitor' },
@@ -860,7 +860,7 @@ export default function LiveBookingBot() {
 
     pushBot({
       kind: 'text',
-      text: `Perfect — closest location looks like ${location}. I'll prioritize that schedule from here.`,
+      text: `📍🔥 PERFECT — ${location} is your nearest dojo and it is INCREDIBLE! 🏆✨ I'm locking that in and pulling up the BEST schedule just for you! Let's get you on the mat! 💪🥋`,
     });
   }, [entities, memory, pushBot, recentMessages]);
 
@@ -917,8 +917,8 @@ export default function LiveBookingBot() {
       window.setTimeout(() => {
         pushBot({
           kind: 'quick-replies',
-          text: "Fresh start — got it. Hey, I'm the MatBoss bot. What brings you in?",
-          quickReplies: ['I want to try a class', 'Is it safe?', 'Kids trial'],
+          text: "🆕✨ Fresh slate, clean energy — I LOVE IT! 💪🔥 I'm the MatBoss bot and I'm FIRED UP to help you! 🥋⚡ So what's calling your warrior spirit today?! 👊💥",
+          quickReplies: ['🥋 I want to try a class!', '🛡️ Is it safe?', '👶 Kids trial!'],
         });
       }, 500);
       return;
