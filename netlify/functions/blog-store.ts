@@ -35,6 +35,61 @@ export async function ensureBlogPostsTable() {
 
       CREATE INDEX IF NOT EXISTS idx_blog_posts_category_published_date
         ON blog_posts (category, published_date DESC);
+
+      ALTER TABLE blog_posts
+        ADD COLUMN IF NOT EXISTS slug VARCHAR(255),
+        ADD COLUMN IF NOT EXISTS category VARCHAR(50),
+        ADD COLUMN IF NOT EXISTS title VARCHAR(255),
+        ADD COLUMN IF NOT EXISTS headline VARCHAR(255),
+        ADD COLUMN IF NOT EXISTS excerpt TEXT,
+        ADD COLUMN IF NOT EXISTS published_date DATE,
+        ADD COLUMN IF NOT EXISTS thumbnail_url TEXT,
+        ADD COLUMN IF NOT EXISTS read_time VARCHAR(32),
+        ADD COLUMN IF NOT EXISTS content JSONB DEFAULT '[]'::jsonb,
+        ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+
+      UPDATE blog_posts
+      SET
+        slug = COALESCE(NULLIF(slug, ''), id),
+        category = COALESCE(NULLIF(category, ''), 'company'),
+        title = COALESCE(NULLIF(title, ''), slug, id),
+        headline = COALESCE(NULLIF(headline, ''), title, slug, id),
+        excerpt = COALESCE(NULLIF(excerpt, ''), headline, title, slug, id),
+        published_date = COALESCE(published_date, CURRENT_DATE),
+        thumbnail_url = COALESCE(NULLIF(thumbnail_url, ''), '/og-image.png'),
+        read_time = COALESCE(NULLIF(read_time, ''), '5 min'),
+        content = COALESCE(content, '[]'::jsonb),
+        created_at = COALESCE(created_at, NOW()),
+        updated_at = COALESCE(updated_at, created_at, NOW())
+      WHERE
+        slug IS NULL OR slug = '' OR
+        category IS NULL OR category = '' OR
+        title IS NULL OR title = '' OR
+        headline IS NULL OR headline = '' OR
+        excerpt IS NULL OR excerpt = '' OR
+        published_date IS NULL OR
+        thumbnail_url IS NULL OR thumbnail_url = '' OR
+        read_time IS NULL OR read_time = '' OR
+        content IS NULL OR
+        created_at IS NULL OR
+        updated_at IS NULL;
+
+      ALTER TABLE blog_posts
+        ALTER COLUMN slug SET NOT NULL,
+        ALTER COLUMN category SET NOT NULL,
+        ALTER COLUMN title SET NOT NULL,
+        ALTER COLUMN headline SET NOT NULL,
+        ALTER COLUMN excerpt SET NOT NULL,
+        ALTER COLUMN published_date SET NOT NULL,
+        ALTER COLUMN thumbnail_url SET NOT NULL,
+        ALTER COLUMN read_time SET NOT NULL,
+        ALTER COLUMN content SET DEFAULT '[]'::jsonb,
+        ALTER COLUMN content SET NOT NULL,
+        ALTER COLUMN created_at SET DEFAULT NOW(),
+        ALTER COLUMN created_at SET NOT NULL,
+        ALTER COLUMN updated_at SET DEFAULT NOW(),
+        ALTER COLUMN updated_at SET NOT NULL;
     `).then(() => undefined).catch((error) => {
       blogTableReady = null;
       throw error;
@@ -169,6 +224,15 @@ export async function saveBlogPost(post: BlogPost): Promise<StoredBlogPost> {
   );
 
   return mapRowToStoredPost(rows[0] as Record<string, unknown>);
+}
+
+export function getDatabaseErrorCode(error: unknown): string | undefined {
+  if (!error || typeof error !== 'object') {
+    return undefined;
+  }
+
+  const code = (error as { code?: unknown }).code;
+  return typeof code === 'string' ? code : undefined;
 }
 
 export async function loadMergedBlogPosts(): Promise<StoredBlogPost[]> {

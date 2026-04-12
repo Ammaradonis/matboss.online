@@ -148,12 +148,15 @@ Set these in **Netlify > Site Settings > Environment Variables**:
 
 | Variable      | Value                        |
 |---------------|------------------------------|
-| `DB_HOST`     | `localhost` for local setup  |
-| `DB_PORT`     | `4040` for this local setup  |
-| `DB_NAME`     | `matboss_online`             |
-| `DB_USER`     | `postgres`                   |
+| `DATABASE_URL` | Preferred for hosted Postgres providers |
+| `DB_HOST`     | `localhost` for local setup or your DB host |
+| `DB_PORT`     | `4040` locally or your provider's port |
+| `DB_NAME`     | `matboss_online` or your hosted database name |
+| `DB_USER`     | `postgres` or your hosted database user |
 | `DB_PASSWORD` | Your database password       |
-| `DB_SSL`      | `true` (for remote DBs)      |
+| `DB_SSL`      | `true` for most remote DBs   |
+
+Use either `DATABASE_URL` or the discrete `DB_*` variables. On Netlify, `DATABASE_URL` is usually the cleanest option.
 
 ---
 

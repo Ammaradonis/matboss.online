@@ -1,7 +1,7 @@
 import type { Context } from '@netlify/functions';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { blogCategories, type BlogPost } from '../../src/data/posts';
-import { loadMergedBlogPosts, saveBlogPost } from './blog-store';
+import { getDatabaseErrorCode, loadMergedBlogPosts, saveBlogPost } from './blog-store';
 
 const JSON_HEADERS = {
   'Content-Type': 'application/json',
@@ -228,7 +228,9 @@ async function handlePost(req: Request) {
   } catch (error: any) {
     console.error('Failed to save blog post:', error);
 
-    if (error?.code === '23505') {
+    const errorCode = getDatabaseErrorCode(error);
+
+    if (errorCode === '23505') {
       return jsonResponse(409, {
         error: 'A post with the same id or slug already exists.',
       });

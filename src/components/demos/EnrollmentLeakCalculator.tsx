@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSanDiegoClock } from './sdTime';
 
 const SD_DEFAULTS = {
   monthlyTrials: 22,
@@ -10,6 +11,7 @@ const SD_DEFAULTS = {
 type Mode = 'manual' | 'matboss';
 
 export default function EnrollmentLeakCalculator() {
+  const clock = useSanDiegoClock(30000);
   const [monthlyTrials, setMonthlyTrials] = useState(SD_DEFAULTS.monthlyTrials);
   const [noShowPct, setNoShowPct] = useState(SD_DEFAULTS.noShowPct);
   const [membershipPrice, setMembershipPrice] = useState(SD_DEFAULTS.membershipPrice);
@@ -154,17 +156,22 @@ export default function EnrollmentLeakCalculator() {
               Leak Calculator · San Diego Benchmarks Loaded
             </span>
           </div>
-          <button
-            onClick={() => {
-              setMonthlyTrials(SD_DEFAULTS.monthlyTrials);
-              setNoShowPct(SD_DEFAULTS.noShowPct);
-              setMembershipPrice(SD_DEFAULTS.membershipPrice);
-              setLifetimeMonths(SD_DEFAULTS.lifetimeMonths);
-            }}
-            className="text-[9px] font-mono text-gray-500 uppercase tracking-widest hover:text-dojo-gold transition-colors"
-          >
-            ↻ Reset to SD Averages
-          </button>
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="text-[10px] font-mono text-gray-500 uppercase tracking-widest">
+              SD <span className="text-dojo-gold">{clock.clock12.replace(/:\d\d (AM|PM)$/, ' $1')}</span> {clock.tzLabel}
+            </span>
+            <button
+              onClick={() => {
+                setMonthlyTrials(SD_DEFAULTS.monthlyTrials);
+                setNoShowPct(SD_DEFAULTS.noShowPct);
+                setMembershipPrice(SD_DEFAULTS.membershipPrice);
+                setLifetimeMonths(SD_DEFAULTS.lifetimeMonths);
+              }}
+              className="text-[9px] font-mono text-gray-500 uppercase tracking-widest hover:text-dojo-gold transition-colors"
+            >
+              ↻ Reset to SD Averages
+            </button>
+          </div>
         </div>
 
         {/* Mode toggle */}

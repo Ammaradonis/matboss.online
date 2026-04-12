@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useSanDiegoClock } from './sdTime';
 
 type MartialArt = 'BJJ' | 'Muay Thai' | 'Karate' | 'MMA' | 'Judo' | 'Kids';
 type Branch = 'showed-up' | 'no-show' | 'positive' | 'silent';
@@ -147,6 +148,7 @@ const BRANCH_META: { id: Branch; label: string; color: string; description: stri
 ];
 
 export default function TrialConversionSequence() {
+  const clock = useSanDiegoClock(30000);
   const [studentName, setStudentName] = useState('Alex Rivera');
   const [schoolName, setSchoolName] = useState('Pacific Coast BJJ');
   const [artId, setArtId] = useState<MartialArt>('BJJ');
@@ -198,8 +200,12 @@ export default function TrialConversionSequence() {
               Sequence Prototype · {activeBranch.label} Path
             </span>
           </div>
-          <div className="text-[10px] font-mono text-gray-500 uppercase tracking-widest">
-            {visibleSteps.length} steps · branching logic active
+          <div className="text-[10px] font-mono text-gray-500 uppercase tracking-widest flex items-center gap-3 flex-wrap">
+            <span>{visibleSteps.length} steps · branching logic active</span>
+            <span className="text-gray-700">·</span>
+            <span>
+              SD <span className="text-dojo-gold">{clock.clock12.replace(/:\d\d (AM|PM)$/, ' $1')}</span> {clock.tzLabel}
+            </span>
           </div>
         </div>
 
