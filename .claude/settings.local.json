@@ -25,7 +25,8 @@
       "Bash(powershell -Command \"Get-Service *postgres*\")",
       "Bash(powershell:*)",
       "Bash(/c/Program Files/PostgreSQL/18/bin/pg_ctl.exe:*)",
-      "Bash(npx esbuild:*)"
+      "Bash(npx esbuild:*)",
+      "Bash(echo \"EXITCODE=$?\")"
     ]
   }
 }

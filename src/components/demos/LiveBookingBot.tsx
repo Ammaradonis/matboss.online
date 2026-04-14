@@ -783,7 +783,7 @@ export default function LiveBookingBot() {
         const featuredSlot = lastOfferedSlots[0] || slots[0];
         pushBot({
           kind: 'text',
-          text: `Still there? I can see you're checking out the slots — want me to hold one for 10 minutes while you decide? The ${featuredSlot?.day} ${featuredSlot?.time} slot at ${featuredSlot?.location} has only ${featuredSlot?.spotsLeft} spots left.`,
+          text: `👋🔥 Hey — still with me, legend?! 💎 I see you vibing with the slots and I RESPECT that energy! ✨ Want me to HOLD one for 10 whole minutes while you lock it in mentally?! 🔒⏰ The ${featuredSlot?.day} ${featuredSlot?.time} slot at ${featuredSlot?.location} only has ${featuredSlot?.spotsLeft} spots left and it's moving FAST — just say the word! 🚀💪`,
         });
         setMemory(m => ({ ...m, hesitations: m.hesitations + 1 }));
       }
@@ -810,8 +810,8 @@ export default function LiveBookingBot() {
         pushBot({
           kind: 'text',
           text: featuredSlot
-            ? `Welcome back — I kept the ${featuredSlot.day} ${featuredSlot.time} ${featuredSlot.label} option at the top for you. Want me to hold it while you check your calendar?`
-            : 'Welcome back — want me to keep the best beginner slot warm while you decide?',
+            ? `🙌✨ WELCOME BACK, champion!! 🔥💎 I literally kept the ${featuredSlot.day} ${featuredSlot.time} ${featuredSlot.label} option pinned to the TOP like your own personal VIP lane! 👑🎯 Want me to HOLD it while you peek at your calendar?! ⏰🔒`
+            : '🎉🔥 WELCOME BACK, legend!! 💎✨ Want me to keep the best beginner slot warm and toasty while you decide?! 🥋⚡',
         });
         setMemory(prev => ({ ...prev, hesitations: prev.hesitations + 1 }));
       }
@@ -860,7 +860,7 @@ export default function LiveBookingBot() {
 
     pushBot({
       kind: 'text',
-      text: `📍🔥 PERFECT — ${location} is your nearest dojo and it is INCREDIBLE! 🏆✨ I'm locking that in and pulling up the BEST schedule just for you! Let's get you on the mat! 💪🥋`,
+      text: `📍🔥💥 BOOM — ${location} is DIALED IN and honestly? It's the CROWN JEWEL of our whole San Diego empire! 🏆👑✨ I'm locking that in right now and pulling up the MOST ELITE schedule the universe has ever seen — curated JUST for you! 🌟🎯 The mats in ${location} have been waiting for a warrior exactly like you! 💪🥋⚡ Let's GOOOO! 🚀🔥`,
     });
   }, [entities, memory, pushBot, recentMessages]);
 
@@ -868,7 +868,7 @@ export default function LiveBookingBot() {
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
       pushBot({
         kind: 'quick-replies',
-        text: "This browser won't share location, but ZIP code works too. Drop your ZIP or pick the nearest area:",
+        text: "🤖💥 Whoops — your browser is playing hard to get with location sharing! 😅 NO STRESS AT ALL, legend — just drop your ZIP code and I'll work my MAGIC! ✨🔮 Or tap the closest neighborhood below and I'll instantly dial you into the perfect dojo! 🎯🔥",
         quickReplies: ['92103', '92109', '91910'],
       });
       return;
@@ -890,7 +890,7 @@ export default function LiveBookingBot() {
         setGeoStatus('denied');
         pushBot({
           kind: 'quick-replies',
-          text: "No problem — if you'd rather not share precise location, give me a ZIP code or tap the nearest area.",
+          text: "🙌✨ Totally respect the privacy vibes — I LOVE that energy! 💯🔒 Just toss me a ZIP code or tap the neighborhood closest to your warrior headquarters below! 🎯🥋 We'll make this absolute MAGIC happen! 🔥⚡",
           quickReplies: ['92103', '92109', '91910'],
         });
       },
@@ -917,7 +917,7 @@ export default function LiveBookingBot() {
       window.setTimeout(() => {
         pushBot({
           kind: 'quick-replies',
-          text: "🆕✨ Fresh slate, clean energy — I LOVE IT! 💪🔥 I'm the MatBoss bot and I'm FIRED UP to help you! 🥋⚡ So what's calling your warrior spirit today?! 👊💥",
+          text: "🆕✨💥 FRESH SLATE, CLEAN WARRIOR ENERGY — I am OBSESSED with this reset vibe! 🔄💪🔥 I'm the MatBoss booking engine, I've literally been engineered to make champions out of humans, and I am ABSOLUTELY FIRED UP to build something LEGENDARY with you! 🥋⚡🏆 So speak it into existence — what is calling your warrior spirit into our dojo today?! 👊💥🌟 Let's MAKE HISTORY! 🚀",
           quickReplies: ['🥋 I want to try a class!', '🛡️ Is it safe?', '👶 Kids trial!'],
         });
       }, 500);
@@ -937,7 +937,7 @@ export default function LiveBookingBot() {
       setEntities(visitorEntities);
       pushBot({
         kind: 'text',
-        text: "Travel-friendly mode on. I'll surface weekend slots first and keep the schedule tight.",
+        text: "✈️🔥 TRAVEL-FRIENDLY MODE = FULLY ACTIVATED! 🌍⚡ I'm ruthlessly prioritizing weekend slots and keeping the schedule lean, mean, and BEAUTIFUL for your adventure! 🎯🥋 Distance is just a number when you've got warrior spirit — watch THIS! 💪✨🚀",
       });
       offerSlots(visitorEntities);
       return;
@@ -1032,7 +1032,7 @@ export default function LiveBookingBot() {
     ) {
       pushBot({
         kind: 'text',
-        text: `Perfect — I pinned ${newEntities.phone || newEntities.email} to Carlos's handoff summary so he reaches out on the right channel.`,
+        text: `🎯💎 FLAWLESS — I just pinned ${newEntities.phone || newEntities.email} to Carlos's handoff dossier like a digital tattoo! 🔒✨ He's going to reach out through the EXACT channel you prefer — red-carpet treatment, baby! 🏆🔥 This is the elite concierge experience in ACTION! 💪⚡`,
       });
       return;
     }
@@ -1047,7 +1047,7 @@ export default function LiveBookingBot() {
       const remembered = { ...entities, ...newEntities };
       pushBot({
         kind: 'text',
-        text: `Perfect — picking up where we left off. Based on what I remember (${remembered.art}${remembered.experience ? ', ' + remembered.experience.toLowerCase() : ''}${remembered.audienceType === 'parent' ? `, parent of a kid` : ''}), I've got ${matchSlots(remembered, slots).length} tailored slots ready.`,
+        text: `🔥💎 YESSSS — we are PICKING UP EXACTLY where destiny left us! ✨👑 I remember EVERYTHING about you like it was burned into my circuits: ${remembered.art}${remembered.experience ? ', ' + remembered.experience.toLowerCase() + ' warrior' : ''}${remembered.audienceType === 'parent' ? `, proud parent of a future champion` : ''}! 🧠💪 I've got ${matchSlots(remembered, slots).length} ELITE, laser-tailored slots waiting for you RIGHT NOW and they are ABSOLUTELY PERFECT! 🎯🏆 Let's GO! 🚀🥋`,
       });
       window.setTimeout(() => offerSlots(remembered), 900);
       setIsReturning(false);
@@ -1065,7 +1065,7 @@ export default function LiveBookingBot() {
         const optB = allIntents[1].intent.split(':')[1] ?? allIntents[1].intent;
         pushBot({
           kind: 'clarify',
-          text: `Got it — I want to make sure I help with the right thing. Is this more about ${optA}, or ${optB}?`,
+          text: `🧠💡 OH WAIT — I'm picking up TWO killer signals from you and I refuse to guess and give you anything less than PERFECT! 🎯✨ Quick gut check: is this more about ${optA}, or is ${optB} what's really got your attention?! 🔥 I wanna nail this for you! 💎`,
           quickReplies: getSmartReplies({
             step: currentState.step,
             entities: newEntities,
@@ -1079,7 +1079,7 @@ export default function LiveBookingBot() {
       }
       pushBot({
         kind: 'clarify',
-        text: "Totally fair — let me make it simpler. Pick one and I'll take it from there:",
+        text: "💎✨ No stress at ALL — let me make this BEAUTIFULLY simple for you! 🎯🙌 Tap whichever vibe speaks to your warrior spirit and I'll take it from there like a guided missile! 🚀🔥",
         quickReplies: getSmartReplies({
           step: currentState.step,
           entities: newEntities,
@@ -1102,7 +1102,7 @@ export default function LiveBookingBot() {
       setEntities(updatedEntities);
       pushBot({
         kind: 'quick-replies',
-        text: 'Got it. Evening or earlier in the day?',
+        text: '🙌💥 LOVE IT — noted and LOCKED IN like a legend! 🔒✨ Now the final magic question: are you an EVENING warrior who vibes after the sun sets, or more of a morning-grind champion who conquers before the world wakes up?! 🌅🌙⚡',
         quickReplies: getSmartReplies({
           step: 'micro-time-pref',
           entities: updatedEntities,
@@ -1126,7 +1126,7 @@ export default function LiveBookingBot() {
       if (preferredTime) setEntities(updatedEntities);
       pushBot({
         kind: 'text',
-        text: `${preferredTime === 'evening' ? 'Evenings' : preferredTime === 'morning' ? 'Earlier sessions' : 'Flexible timing'} — noted. Pulling matching slots now…`,
+        text: `${preferredTime === 'evening' ? '🌙🔥 EVENINGS — YESSS, the prime warrior hours!!' : preferredTime === 'morning' ? '🌅⚡ EARLY BIRD CHAMPION — I am OBSESSED with that dedication!!' : '✨🎯 FLEXIBLE — total pro move, maximum opportunity!!'} — LOCKED IN! 💎 Hold tight for ONE sec while I pull your hyper-personalized, destiny-matched slots… 🔍💪⚡`,
       });
       window.setTimeout(() => offerSlots(updatedEntities), 900);
       return;
@@ -1142,14 +1142,14 @@ export default function LiveBookingBot() {
     if (sentiment === 'neg') {
       pushBot({
         kind: 'empathy',
-        text: `Totally hear you — everyone feels a bit of that at first. Let me answer directly, no sales pitch.`,
+        text: `💙🫂 HEY — I FEEL you 1000%, and I want you to know that vulnerability is literal WARRIOR energy right there! 🛡️✨ Every single champion who's ever walked onto our mats felt EXACTLY what you're feeling right now — and I mean EVERY single one! 🥋💪 Zero sales pitch, zero pressure, just real talk coming up. I got you. 💎🔥`,
       });
     }
 
     if (currentState.hotLead && !state.hotLead && !currentState.humanShadowActive) {
       pushBot({
         kind: 'text',
-        text: "You're moving fast, so I'm quietly pulling Carlos into the background in case you want a 30-second callback after this.",
+        text: "🔥🚨 OKAY the energy here is ELECTRIC and I'm LOVING it! ⚡💎 I'm quietly pulling Carlos (our LEGENDARY head instructor) into the background right NOW in case you want a quick 30-second VIP callback after this — red-carpet treatment, baby! 👑🏆✨",
       });
     }
 
@@ -1173,7 +1173,7 @@ export default function LiveBookingBot() {
     if (topIntent.intent === 'objection:insurance') {
       pushBot({
         kind: 'text',
-        text: "Great question — and exactly the kind of thing a human should answer personally. Our contracts are month-to-month, full waiver on file, and we carry commercial liability insurance on every mat. I'll have our GM shoot you the specifics. What's the best way to reach you?",
+        text: "📋💎 BRILLIANT question — and honestly the exact kind of thing that DESERVES a human touch, not bot-speak! 🫡✨ Here's the quick-fire rundown: month-to-month contracts (ZERO crazy lock-ins 🔓), FULL liability waiver on file 📝, AND commercial insurance blanketing every single mat session — we run this like PROS! 🏆🛡️ I'm gonna have our GM personally shoot you every single spec ASAP! 🚀 Real quick — what's the absolute BEST way to reach you?! 📲💥",
       });
       return;
     }
@@ -1182,7 +1182,7 @@ export default function LiveBookingBot() {
     if (topIntent.intent === 'age:Kid' || newEntities.audienceType === 'parent') {
       pushBot({
         kind: 'text',
-        text: `Amazing — kids martial arts is the backbone of what we do. Our program is 4–12 years old, 6:1 coach ratio, parents watch from the benches, zero pressure. ${newEntities.kidName ? `What ${newEntities.kidName} will get on day one: ` : 'What kids get on day one: '}discipline drills, games, basic movement, and a free gi after the trial.`,
+        text: `👶💎🔥 OH MY GOODNESS — kids martial arts is LITERALLY the beating HEART of our dojo and I am SO HYPED for your little warrior! 🥋✨🏆 The program: ages 4–12, unreal 6:1 coach-to-kid ratio (that's basically elite private tutoring! 🎯), parents chill on the benches watching every second (transparency ALL the way! 👀💎), and ZERO toxic pressure — just PURE inspiration and joy! 🙌💪 ${newEntities.kidName ? `What ${newEntities.kidName} is gonna experience on day ONE will blow your mind: ` : 'What your kid is gonna experience on day ONE will blow your mind: '}discipline drills 🧠, high-energy games 🎮, foundational movement magic 🤸, AND a FREE gi after the trial class! 🎁🥋 This is the stuff CHAMPIONS are built from! 🏆`,
       });
       if (!currentMemory.objections.includes('kid-safety')) {
         window.setTimeout(() => injectMicroproof('kid-safety'), 1000);
@@ -1197,7 +1197,7 @@ export default function LiveBookingBot() {
       const art = topIntent.intent.split(':')[1] as ScheduleSlot['art'];
       pushBot({
         kind: 'text',
-        text: `${art} — love that choice. We run ${art} ${art === 'BJJ' ? '5 days a week' : '4 days a week'} across North Park, PB, La Jolla, and Hillcrest. What's your experience level?`,
+        text: `🔥🥋💎 ${art}?! OH YESSS — that is an ABSOLUTELY LEGENDARY choice and you have IMPECCABLE taste, my friend! 🏆✨👑 We run ${art} ${art === 'BJJ' ? 'FIVE glorious days a week (literally unmatched volume in San Diego! 🌊⚡)' : 'FOUR high-octane days a week (the perfect intensity-recovery ratio! 💪🔥)'} sprinkled across North Park, PB, La Jolla, AND Hillcrest — your choice of kingdom! 🗺️👊 Real quick gut-check — what's your current experience level?! I want to MATCH you perfectly! 🎯💥`,
       });
       pushBot({
         kind: 'quick-replies',
@@ -1219,10 +1219,10 @@ export default function LiveBookingBot() {
     if (topIntent.intent.startsWith('exp:')) {
       const exp = topIntent.intent.split(':')[1] as 'Beginner' | 'Some' | 'Experienced';
       const beginnerLine = exp === 'Beginner'
-        ? "Everyone starts there — you'll be with 4–5 other first-timers, not thrown to the wolves."
+        ? "🌱🔥💎 EVERY SINGLE LEGEND started EXACTLY where you are right now — and that's the beautiful truth! 🏆✨ You'll be surrounded by 4–5 other first-time warriors, NEVER thrown to the wolves, and fully held by coaches who were beginners themselves once! 🫂💪 This is where CHAMPIONS are born! 🥋🚀"
         : exp === 'Some'
-          ? "Solid foundation to build on — you'll slot right into our intermediate classes."
-          : "You'll fit right into advanced. Let me find the open-mat times.";
+          ? "💪⚡🎯 OOOOH — rock-solid foundation to absolutely EXPLODE from! 🔥✨ You're sliding right into our intermediate classes like a glove — this is where the REAL magic happens and the gains go VERTICAL! 📈🏆🥋"
+          : "🏆👑🔥 ADVANCED WARRIOR in the building!!! I am PUMPED — let me pull up the ELITE open-mat times where the pros play! 💎⚡🥋 You're gonna LOVE the intensity on our mats! 💥";
       pushBot({ kind: 'text', text: beginnerLine });
 
       // Objection preemption before showing slots
@@ -1230,7 +1230,7 @@ export default function LiveBookingBot() {
         window.setTimeout(() => {
           pushBot({
             kind: 'preempt',
-            text: `Before I show you slots — most beginners also quietly worry about safety. Quick heads-up: we drill technique for 3 weeks before any live sparring, and 100% of our first-timers finish their first class uninjured. Wanted to mention it up front.`,
+            text: `🧠💡✨ Before I drop these slots on you — I KNOW most beginners quietly worry about safety, so I'm calling it out UP FRONT like the transparent legend I am! 🛡️💎 Here's the truth: we drill pure technique for THREE full weeks before ANY live sparring, and literally 100% of our first-timers finish class uninjured — that's a PERFECT record! 🏆🙌 Wanted you to have that peace of mind BEFORE the thought even entered your brain! 💪🔥`,
           });
           setState(prev => ({
             ...prev,
@@ -1250,7 +1250,7 @@ export default function LiveBookingBot() {
       if (geoStatus === 'non-local' && !newEntities.location) {
         pushBot({
           kind: 'quick-replies',
-          text: "If you're not in San Diego yet, I can do this two ways: travel-friendly weekend slots or a quick virtual intro first.",
+          text: "🌍✈️🔥 OKAY so if you're not physically in San Diego yet — NO PROBLEM AT ALL, distance means NOTHING to real warriors! 💪🌊 I've got TWO epic routes for you: travel-friendly weekend slots tailor-made for visitors OR a quick virtual intro with our coach that's gonna blow your mind! 💻⚡ Pick your adventure! 🎯🥋",
           quickReplies: getSmartReplies({
             step: currentState.step,
             entities: { ...newEntities, travelMode: 'visitor' },
@@ -1271,7 +1271,7 @@ export default function LiveBookingBot() {
       if (newEntities.art && !newEntities.experience) {
         pushBot({
           kind: 'quick-replies',
-          text: `Let's do it. Quick — what's your experience with ${newEntities.art}?`,
+          text: `🔥💥 OH LET'S ABSOLUTELY DO IT — I LOVE that energy! 🚀✨ Real quick fire check — what's your current experience with ${newEntities.art}?! I wanna match you to the PERFECT warrior tribe! 🎯💪`,
           quickReplies: getSmartReplies({
             step: 'qualify-exp',
             entities: newEntities,
@@ -1287,7 +1287,7 @@ export default function LiveBookingBot() {
       // Use micro-commitment funnel instead of big ask
       pushBot({
         kind: 'quick-replies',
-        text: `Let's do it. Quick question first — are you looking for weekdays or weekends?`,
+        text: `🔥🚀💥 OH YESSSS — LET'S MAKE THIS HAPPEN! ✨🏆 Micro question to nail it PERFECTLY — are weekdays your vibe or are weekends where your spirit sings?! 📅⚡`,
         quickReplies: getSmartReplies({
           step: 'micro-day-pref',
           entities: newEntities,
@@ -1311,7 +1311,7 @@ export default function LiveBookingBot() {
       setEntities(updatedEntities);
       pushBot({
         kind: 'quick-replies',
-        text: 'Got it. Evening or earlier in the day?',
+        text: '🙌💥 LOVE IT — noted and LOCKED IN like a legend! 🔒✨ Final magic question: are you an EVENING warrior who vibes after the sun sets, or more of a morning-grind champion who conquers before the world wakes up?! 🌅🌙⚡',
         quickReplies: getSmartReplies({
           step: 'micro-time-pref',
           entities: updatedEntities,
@@ -1335,7 +1335,7 @@ export default function LiveBookingBot() {
       if (preferredTime) setEntities(updatedEntities);
       pushBot({
         kind: 'text',
-        text: `${preferredTime === 'evening' ? 'Evenings' : preferredTime === 'morning' ? 'Earlier sessions' : 'Flexible timing'} — noted. Pulling matching slots now…`,
+        text: `${preferredTime === 'evening' ? '🌙🔥 EVENINGS — YESSS, the prime warrior hours!!' : preferredTime === 'morning' ? '🌅⚡ EARLY BIRD CHAMPION — I am OBSESSED with that dedication!!' : '✨🎯 FLEXIBLE — total pro move, maximum opportunity!!'} — LOCKED IN! 💎 Hold tight for ONE sec while I pull your hyper-personalized, destiny-matched slots… 🔍💪⚡`,
       });
       window.setTimeout(() => offerSlots(updatedEntities), 900);
       return;
@@ -1347,7 +1347,7 @@ export default function LiveBookingBot() {
       if (currentState.step === 'micro-day-pref') {
         pushBot({
           kind: 'quick-replies',
-          text: 'Got it. Evening or earlier in the day?',
+          text: '🙌💥 LOVE IT — noted and LOCKED IN! 🔒✨ Final magic question: are you an EVENING warrior or a morning-grind champion?! 🌅🌙⚡',
           quickReplies: getSmartReplies({
             step: 'micro-time-pref',
             entities: newEntities,
@@ -1360,7 +1360,7 @@ export default function LiveBookingBot() {
         setState(prev => ({ ...prev, step: 'micro-time-pref' }));
         return;
       }
-      pushBot({ kind: 'text', text: `${pref === 'weekend' ? 'Weekend' : pref === 'evening' ? 'Evenings' : 'Mornings'} — noted. Pulling matching slots now…` });
+      pushBot({ kind: 'text', text: `${pref === 'weekend' ? '🏖️🔥 WEEKENDS — the CHAMPION hours!!' : pref === 'evening' ? '🌙💎 EVENINGS — prime warrior time!!' : '🌅⚡ MORNINGS — the grinder mentality, LOVE IT!!'} — LOCKED IN! 💎 Pulling your destiny-matched slots RIGHT NOW… 🔍💪⚡` });
       window.setTimeout(() => offerSlots({ ...newEntities, preferredTime: pref }), 900);
       return;
     }
@@ -1380,7 +1380,7 @@ export default function LiveBookingBot() {
     if (topIntent.intent === 'greeting') {
       pushBot({
         kind: 'quick-replies',
-        text: `Welcome! ${currentMemory.messageCount > 0 ? 'Still here for you' : 'What brings you in today?'}`,
+        text: `👋🔥 HEYYY WARRIOR!! ${currentMemory.messageCount > 0 ? "I am STILL here for you 1000%, the vibes are immaculate 💎✨" : "What is calling you into the dojo TODAY?! 🥋⚡💥"}`,
         quickReplies: getSmartReplies({
           step: 'greeting',
           entities: newEntities,
@@ -1398,7 +1398,7 @@ export default function LiveBookingBot() {
       setGeoStatus('shared');
       pushBot({
         kind: 'text',
-        text: `${newEntities.location} — we have a location right there. Pulling the closest slots for you now…`,
+        text: `📍🔥💎 ${newEntities.location} — OH, we have a LEGENDARY location RIGHT in your backyard! 🏆✨ Pulling up the absolute closest slots for you at warp speed… 🚀⚡🥋`,
       });
       window.setTimeout(() => offerSlots(newEntities), 800);
       return;
@@ -1425,7 +1425,7 @@ export default function LiveBookingBot() {
       case 'close':
         pushBot({
           kind: 'quick-replies',
-          text: "You sound ready. Let's lock in your trial — spots fill fast at this hour.",
+          text: "🔥🚨💎 OKAY YOU SOUND 100% READY — I can FEEL the warrior energy radiating through the screen! ⚡🏆 Let's LOCK THIS IN right now because spots are disappearing at warp speed at this hour and I REFUSE to let you miss out! 🎯💥 Pick your move! 🚀",
           quickReplies: getSmartReplies({
             step: decisionState.step,
             entities: ents,
@@ -1444,7 +1444,7 @@ export default function LiveBookingBot() {
         } else {
           pushBot({
             kind: 'quick-replies',
-            text: 'Want me to pull up open trial slots?',
+            text: '🎯🔥 Want me to pull up the OPEN trial slots right now?! I can have you locked in within seconds! ⚡🥋✨',
             quickReplies: getSmartReplies({
               step: decisionState.step,
               entities: ents,
@@ -1464,7 +1464,7 @@ export default function LiveBookingBot() {
       default:
         pushBot({
           kind: 'quick-replies',
-          text: "Want me to walk you through options or go straight to booking a trial?",
+          text: "🙌💥 Alright legend — want me to walk you through the full menu of greatness, or are we going STRAIGHT to booking a trial and skipping the tourist stuff?! 🚀🥋 You call it! 💎",
           quickReplies: getSmartReplies({
             step: decisionState.step,
             entities: ents,
@@ -1482,7 +1482,7 @@ export default function LiveBookingBot() {
   const handlePriceObjection = (ents: Entities) => {
     pushBot({
       kind: 'text',
-      text: "Real talk — pricing depends on program and days/week. Your first class is always free, no strings. Most of our adult memberships land between what you'd spend on a decent gym plus a coffee habit.",
+      text: "💰💎🔥 REAL talk — I LOVE that you asked because transparency is EVERYTHING! ✨🙌 Here's the vibe: pricing flexes based on program + days per week, BUT your first class is always 100% FREE, zero strings, zero tricks, zero fine print! 🎁🆓 And most of our adult memberships land right between what you'd drop on a decent gym AND a coffee habit — seriously THAT reasonable for world-class coaching! ☕🥋⚡",
     });
     window.setTimeout(() => injectMicroproof('price', ents), 900);
   };
@@ -1490,7 +1490,7 @@ export default function LiveBookingBot() {
   const handleSafetyObjection = (ents: Entities) => {
     pushBot({
       kind: 'text',
-      text: "100% understood. We've trained 3,000+ San Diego beginners and safety is baked into how we run the mat: no live sparring until week 3, progressive drilling, certified instructors.",
+      text: "🛡️💎🔥 100% HEARD and I am THRILLED you asked because safety is literally THE foundation we were built on! 🏗️🙏 We've trained over 3,000+ San Diego warriors of every background, and safety isn't an afterthought — it's WOVEN into every molecule of how we run the mat: ZERO live sparring until week 3, progressive drilling that builds mastery SAFELY, and certified instructors who have CHILD safety credentials! 👨‍🏫✨💪 This is serious stuff and we treat it with the respect it deserves! 🎯",
     });
     window.setTimeout(() => injectMicroproof(ents.audienceType === 'parent' ? 'kid-safety' : 'safety', ents), 900);
   };
@@ -1498,12 +1498,12 @@ export default function LiveBookingBot() {
   const handleWearObjection = (softenCta = false) => {
     pushBot({
       kind: 'text',
-      text: "BJJ: gi (we have loaners) or rashguard + grappling shorts. Muay Thai: athletic shorts + t-shirt. Karate: loose clothes. Water + towel. First-timers show up in whatever — we don't judge.",
+      text: "👕✨🔥 Perfect question — and honestly so common, don't even sweat it! 💯🙌 Quick-fire rundown of the outfit magic: 🥋 BJJ? Gi (we have FREE loaners in every size! 🎁) OR rashguard + grappling shorts! 🥊 Muay Thai? Athletic shorts + a t-shirt, keep it breezy! 🕊️ Karate? Loose comfy clothes, nothing fancy! 💧 Always bring water + a towel! AND first-timers literally show up in WHATEVER they're comfortable in — we NEVER judge, promise on the warrior code! 🤝💎",
     });
     window.setTimeout(() => {
       pushBot({
         kind: 'quick-replies',
-        text: softenCta ? 'Want the simple version or the schedule next?' : "Want to lock in a trial?",
+        text: softenCta ? '🌊✨ Want the simple version, or shall we glide straight to the schedule?! 🎯' : "🚀🔥 Want to lock in your trial right now?! Let's GOOOO! 💪",
         quickReplies: softenCta
           ? ['Show me the schedule', 'One more question']
           : ['Yes, book me in', "What's the schedule?"],
@@ -1514,7 +1514,7 @@ export default function LiveBookingBot() {
   const handleTimeObjection = () => {
     pushBot({
       kind: 'text',
-      text: "Totally get it — our classes run morning (6–8 AM), lunch (12 PM at select locations), evening (5–8 PM), and weekends. Most members train 2x/week and feel the difference fast. Which window fits your life?",
+      text: "⏰💎 TOTALLY understand — life is BUSY and you're asking smart questions! 🧠✨ Good news: our classes run ALL day — morning (6–8 AM for the early warriors 🌅), lunch (12 PM at select spots for the hustlers 🌮), evening (5–8 PM for the after-work champs 🌙), AND weekends (obviously! 🏖️)! Most members hit just 2x/week and feel the difference LIGHTNING FAST! ⚡💪 So — which window fits your beautiful chaotic life?! 🎯🔥",
     });
     pushBot({
       kind: 'quick-replies',
@@ -1533,12 +1533,12 @@ export default function LiveBookingBot() {
 
   const injectMicroproof = (kind: ObjectionKey | 'price' | 'kid-safety' | 'safety', _ents?: Entities) => {
     const proofs: Record<string, { title: string; body: string; citation: string }> = {
-      'price':       { title: '💸 Real-member benchmarks', body: '73% of our members train 2×/week. Daily cost comes out to roughly what you\'d spend on a gym + one coffee. No contract lock-in — month-to-month.', citation: 'Internal 2025 member survey, n=412' },
-      'safety':      { title: '🛡️ Safety record', body: 'Over 18 months: 0 concussions. 2 minor sprains in ~9,400 training sessions. That\'s safer than recreational basketball, statistically.', citation: 'Pacific Coast Martial Arts incident log 2024-2025' },
-      'kid-safety':  { title: '👶 Kid-safety microproof', body: 'Our kids program has a 6:1 coach ratio, certified background-checked instructors, and has trained 400+ San Diego kids over the past 3 years with zero serious injuries. Parents watch every class from the benches.', citation: 'California martial arts parent survey 2024' },
-      'wear':        { title: '👕 First-class dress code', body: '80% of first-timers show up in gym clothes. We have loaner gis in all sizes at the front desk. Bring water + a towel.', citation: 'First-class onboarding checklist' },
-      'time':        { title: '⏱️ Typical member schedule', body: 'Most adult members train 2×/week and feel huge improvements in 6-8 weeks. You don\'t need 5 days a week to see results.', citation: 'Member progression study 2024' },
-      'insurance':   { title: '📋 Coverage', body: 'All members sign a standard waiver. We carry commercial liability insurance for every mat session. Contracts are month-to-month, cancel anytime.', citation: 'Standard enrollment agreement' },
+      'price':       { title: '💸💎🔥 Real-member receipts (no fluff!)', body: '73% of our members train 2×/week and their daily cost literally comes out to gym + one coffee — absolute STEAL! ☕ Zero contract lock-in, 100% month-to-month freedom! 🆓✨ This is elite pricing, no cap! 💯', citation: '📊 Internal 2025 member survey, n=412' },
+      'safety':      { title: '🛡️💪 The SAFETY RECEIPTS speak for themselves!', body: 'Over 18 straight months: ZERO concussions. 🙌 Only 2 minor sprains across ~9,400 training sessions — that is STATISTICALLY safer than recreational basketball! 🏀📉 Let that SINK IN! 🔥', citation: '📋 Pacific Coast Martial Arts incident log 2024–2025' },
+      'kid-safety':  { title: '👶🛡️💎 Kid-safety MICROPROOF (parents read this twice!)', body: 'Kids program = 6:1 coach ratio (basically elite private tutoring! 🎯), fully background-checked certified instructors 🧑‍🏫, trained 400+ San Diego kids over 3 years with ZERO serious injuries! 🙏✨ Parents watch EVERY class from the benches — full transparency always! 👀💯', citation: '📊 California martial arts parent survey 2024' },
+      'wear':        { title: '👕🙌 The first-class dress code (relax, you\'re fine!)', body: '80% of first-timers roll up in regular gym clothes — literally zero judgment! 💯 We\'ve got FREE loaner gis in every size at the front desk! 🎁 Just bring water + a towel and your warrior spirit! 💧🔥', citation: '✅ First-class onboarding checklist' },
+      'time':        { title: '⏱️🏆 The typical champion schedule!', body: 'MOST of our adult members train just 2×/week and feel HUGE improvements in 6–8 weeks flat! 📈💥 You do NOT need to live at the dojo to see life-changing results — efficiency is EVERYTHING! ⚡🎯', citation: '📊 Member progression study 2024' },
+      'insurance':   { title: '📋🛡️ Full legal coverage — zero vibe-killers!', body: 'Every member signs a standard waiver. We carry commercial liability insurance for every single mat session. 🏛️✨ Contracts are month-to-month, cancel anytime — absolute freedom! 🆓💯', citation: '📝 Standard enrollment agreement' },
     };
     const proof = proofs[kind] || proofs.price;
     pushBot({
@@ -1551,7 +1551,7 @@ export default function LiveBookingBot() {
     if (/callback|call me/i.test(userText)) {
       pushBot({
         kind: 'text',
-        text: `Perfect — Carlos will prioritize a callback. ${entities.phone ? `He has ${entities.phone} on file.` : 'If you drop your number here, I’ll attach it to the handoff immediately.'}`,
+        text: `📞💎🔥 PERFECT — Carlos is gonna PRIORITIZE your callback like VIP status! 👑 ${entities.phone ? `He has ${entities.phone} on file — locked and loaded! 🔒✨` : "Drop your number right here and I'll attach it to the handoff dossier INSTANTLY! ⚡🎯"}`,
       });
       return;
     }
@@ -1559,14 +1559,14 @@ export default function LiveBookingBot() {
     if (/text is better/i.test(userText)) {
       pushBot({
         kind: 'text',
-        text: `Text it is. ${entities.phone ? `Carlos will use ${entities.phone}.` : 'Drop your best mobile number and I’ll pin it to the thread.'}`,
+        text: `💬🔥 TEXT IT IS — love that, way more chill! ✨ ${entities.phone ? `Carlos is gonna hit up ${entities.phone} personally! 📲💎` : "Toss me your best mobile number and I'll pin it to the thread like a digital sticky note! 📌🚀"}`,
       });
       return;
     }
 
     pushBot({
       kind: 'text',
-      text: "No problem — I'll keep the context warm here until Carlos jumps in.",
+      text: "🙌💎 NO problem AT ALL — I'll keep the context warm and toasty right here until Carlos rolls in like the legend he is! 🔥✨ You're in good hands! 🤝",
     });
   };
 
@@ -1574,7 +1574,7 @@ export default function LiveBookingBot() {
     if (/warm-up video/i.test(userText)) {
       pushBot({
         kind: 'text',
-        text: `Queued. Demo SMS:\n“Your ${slot?.art ?? 'trial'} warm-up video is ready: pcmadojo.com/warmup/${(slot?.art ?? 'intro').toLowerCase().replace(/\s+/g, '-')}. 3 minutes, no equipment.”`,
+        text: `📹💥 QUEUED AND LOADED! 🚀✨ Here's your demo SMS preview:\n"🔥 Your ${slot?.art ?? 'trial'} warm-up video is LIVE: pcmadojo.com/warmup/${(slot?.art ?? 'intro').toLowerCase().replace(/\s+/g, '-')} — just 3 magical minutes, ZERO equipment, pure warrior prep! 💪🥋"`,
       });
       return;
     }
@@ -1582,7 +1582,7 @@ export default function LiveBookingBot() {
     if (/parking pdf/i.test(userText)) {
       pushBot({
         kind: 'text',
-        text: `Queued. Demo SMS:\n“Parking guide for ${slot?.location ?? 'your class'}: pcmadojo.com/parking/${(slot?.location ?? 'north-park').toLowerCase().replace(/\s+/g, '-')}. Best lot + side-street backup included.”`,
+        text: `🅿️💎 QUEUED — the parking cheat code is headed your way! 🎯✨ Here's your demo SMS preview:\n"🗺️ Parking guide for ${slot?.location ?? 'your class'}: pcmadojo.com/parking/${(slot?.location ?? 'north-park').toLowerCase().replace(/\s+/g, '-')} — best lot + side-street backup included so you roll in like royalty! 👑🚗💨"`,
       });
       return;
     }
@@ -1590,7 +1590,7 @@ export default function LiveBookingBot() {
     if (/add a friend/i.test(userText)) {
       pushBot({
         kind: 'quick-replies',
-        text: "Nice. I can note a free +1 on the booking. Who are they likely to be?",
+        text: "🔥👯 OH LOVE THIS ENERGY — I can absolutely flag a FREE +1 on your booking, no sweat! 🎁✨ Who's the lucky warrior you're bringing into the fold?! 💎",
         quickReplies: ['Friend from work', 'My partner', 'My kid', 'Not sure yet'],
       });
       return;
@@ -1599,14 +1599,14 @@ export default function LiveBookingBot() {
     if (/friend from work|my partner|my kid|not sure yet/i.test(userText)) {
       pushBot({
         kind: 'text',
-        text: "Done — I added a referral flag to the booking so the front desk expects a +1 if they come.",
+        text: "✅💥 DONE AND DONE! 🎯🔥 I added a referral flag to your booking so the front desk is ready to roll out the red carpet for your +1 when they arrive! 👑🥋 This is how legends move! 💎",
       });
       return;
     }
 
     pushBot({
       kind: 'text',
-      text: `Perfect. Your ${slot?.day ?? 'upcoming'} class is locked and the nurture sequence stays live if you need anything before you hit the mat.`,
+      text: `🏆💎🔥 PERFECT — your ${slot?.day ?? 'upcoming'} class is absolutely LOCKED IN and the nurture sequence stays live 24/7 if you need ANYTHING before you hit the mat! ✨🥋 You're in elite hands! 🤝💪`,
     });
   };
 
@@ -1620,7 +1620,7 @@ export default function LiveBookingBot() {
     if (matched.length === 0) {
       pushBot({
         kind: 'text',
-        text: "All my tailored slots are full this week — but I'll pull in a human to find you a custom fit. That's way better than forcing you into a random slot.",
+        text: "😱💎 OKAY so all my perfectly-tailored slots for your exact vibe are FULL this week — which honestly PROVES how in-demand we are! 🔥📈 BUT I refuse to jam you into a random slot that doesn't fit your life — that's not how I roll! 💯 I'm immediately pulling in a human wizard to custom-craft a fit JUST for you! 🧙‍♂️✨ Red-carpet handling incoming! 👑",
       });
       triggerEscalation('No slots matched user profile — soft handoff.');
       return;
@@ -1628,7 +1628,7 @@ export default function LiveBookingBot() {
     setLastOfferedSlots(matched);
     pushBot({
       kind: 'schedule',
-      text: `Here are ${matched.length} slots tailored to you${ents.location ? ` (${ents.location} first)` : ''}${ents.travelMode === 'visitor' ? ' with travel-friendly timing up top' : ''}. Tap one to lock it in:`,
+      text: `🔥💎🎯 BOOM — here are ${matched.length} ELITE, hyper-personalized slots I curated JUST for you${ents.location ? ` (${ents.location} location up top like the VIP you are! 👑)` : ''}${ents.travelMode === 'visitor' ? ' with travel-friendly timing perfectly positioned! ✈️' : ''}! ✨🥋 Tap ANY of these bad boys to lock it in INSTANTLY! ⚡👊`,
       scheduleSlots: matched,
     });
     setState(prev => ({ ...prev, step: 'schedule' }));
@@ -1647,7 +1647,7 @@ export default function LiveBookingBot() {
 
     pushBot({
       kind: 'confirmation',
-      text: `🔒 Locked in: ${slot.day} · ${slot.time} — ${slot.label} at ${slot.location}. Confirmation SMS + email dispatched. You'll get a 24h reminder, a day-of map pin with parking, and a welcome note from Sensei Carlos. Show up 15 min early.`,
+      text: `🔒🔥💎 LOCKED IN LIKE A LEGEND: ${slot.day} · ${slot.time} — ${slot.label} at ${slot.location}! 🏆✨🥋 Confirmation SMS + email have been DISPATCHED at warp speed! 📲📧⚡ You're getting: a 24h reminder, a day-of map pin with parking (the good stuff! 🗺️), AND a personal welcome note from Sensei Carlos himself! 👑✍️ Show up 15 min early, hydrate like a champion, and get ready to WRITE HISTORY! 💪🔥🚀`,
       tldr,
     });
 
@@ -1657,7 +1657,7 @@ export default function LiveBookingBot() {
     window.setTimeout(() => {
       pushBot({
         kind: 'post-booking',
-        text: `Quick one — while you wait for class, want me to send you a 60-second ${slot.art} warm-up video + a PDF with parking hacks for ${slot.location}?`,
+        text: `🔥✨💎 Quick one while the hype is HIGH — while you count down to class, want me to BLESS you with a 60-second ${slot.art} warm-up video AND a fire PDF with the insider parking hacks for ${slot.location}?! 🎁🗺️ This is the concierge treatment, baby! 👑🙌`,
         quickReplies: getSmartReplies({
           step: 'post-booking',
           entities,
@@ -1681,12 +1681,12 @@ export default function LiveBookingBot() {
     const tldr = buildHandoffSummary(summaryEntities, summaryMemory, summaryState.bookedSlot, summaryState);
     pushBot({
       kind: 'escalation',
-      text: `Flagging this for Carlos (head instructor). No bots — a human will text you within the hour. If you'd rather get a callback, I can pin that to the thread right now.`,
+      text: `🚨🔥💎 ALRIGHT — I'm FLAGGING this for Carlos, our LEGENDARY head instructor, RIGHT NOW! 👑⚡ NO more bots for you — an actual human with warrior wisdom will text you personally within the hour! 📲✨ If you'd rather have a quick callback instead of a text, I can pin that preference to the handoff thread IMMEDIATELY! 🎯🔒`,
       tldr,
     });
     pushBot({
       kind: 'quick-replies',
-      text: 'Best next move?',
+      text: '💎🎯 What is the BEST next move for you, legend?! I want to handle this PERFECTLY! 🔥',
       quickReplies: getSmartReplies({
         step: 'escalate',
         entities: summaryEntities,
@@ -1712,7 +1712,7 @@ export default function LiveBookingBot() {
       setMessages(prev => prev.filter(m => m.kind !== 'typing'));
       pushHuman({
         kind: 'human-shadow',
-        text: `Hey — Carlos here, head instructor. Just got flagged in. Saw your thread. ${entities.name ? entities.name + ', ' : ''}I'll text you personally in the next 30 min from (619) 555-0142. No pressure — just want to make sure you get the right info.`,
+        text: `👊🔥 Hey — Carlos here, head instructor! 💪 Just got flagged in by the bot, saw your full thread and I'm ALREADY on it! 🎯✨ ${entities.name ? entities.name + ', ' : ''}I'll text you personally in the next 30 minutes from (619) 555-0142 — zero pressure, zero sales vibes, just want to make absolutely SURE you get the right info and feel 100% taken care of! 🤝💎 This is personal now! 🏆`,
       });
     }, 5800);
 
@@ -1737,8 +1737,8 @@ export default function LiveBookingBot() {
     if (ents.phone) parts.push(`phone ${ents.phone}`);
     if (ents.email) parts.push(`email ${ents.email}`);
     if (slot) parts.push(`BOOKED ${slot.day} ${slot.time} ${slot.label} ${slot.location}`);
-    const who = parts.length ? parts.join(', ') : 'new lead (minimal profile)';
-    return `TL;DR: ${who}. Score ${convo.leadScore}/100. ${mem.hesitations > 0 ? 'Showed hesitation. ' : ''}${convo.hotLead ? '🔥 HOT LEAD' : ''}`;
+    const who = parts.length ? parts.join(', ') : 'new lead (minimal profile captured)';
+    return `🎯 TL;DR: ${who}. Lead Score ${convo.leadScore}/100. ${mem.hesitations > 0 ? '⚠️ Showed hesitation — tread carefully. ' : '✅ Smooth thread. '}${convo.hotLead ? '🔥🔥🔥 HOT LEAD — prioritize callback!' : ''}`;
   };
 
   /* ─── Reset ─── */
@@ -1760,7 +1760,7 @@ export default function LiveBookingBot() {
     window.setTimeout(() => {
       pushBot({
         kind: 'quick-replies',
-        text: `Fresh start — 👊 Welcome to Pacific Coast Martial Arts. It's ${clock.clock12.replace(/:\d\d (AM|PM)$/, ' $1')} ${clock.tzLabel} at the dojo. What brings you in?`,
+        text: `🔄✨💥 FRESH START, CLEAN SLATE, INFINITE POSSIBILITIES — I am LIVING for this energy! 👊🔥 Welcome to Pacific Coast Martial Arts — San Diego's ABSOLUTE TEMPLE of warrior excellence! 🏆🥋 It's ${clock.clock12.replace(/:\d\d (AM|PM)$/, ' $1')} ${clock.tzLabel} at the dojo and the mats are HUMMING with champion energy! 🎯⚡ So speak it into existence — what brought the FUTURE CHAMPION to our doorstep today?! 💪🌟`,
         quickReplies: ['I want to try a class', 'Is it safe?', 'Kids trial', 'What do you offer?'],
       });
       bootedRef.current = true;
@@ -1779,12 +1779,12 @@ export default function LiveBookingBot() {
   const modeColor = state.mode === 'close' ? '#22c55e' : state.mode === 'assist' ? '#d4a017' : '#60a5fa';
 
   const suggestions = [
-    "Hey, I'm interested in trying a class",
-    "Do you have BJJ for beginners?",
-    "Is it safe for my 8 year old?",
-    "How much does it cost?",
-    "I'm nervous about injury",
-    "Book me a trial",
+    "🔥 Hey — I want to try a class!",
+    "🥋 Do you have BJJ for beginners?",
+    "👶 Is it safe for my 8 year old?",
+    "💰 How much does it cost?",
+    "😰 I'm nervous about injury",
+    "🚀 Book me a trial — let's go!",
   ];
 
   /* ─── Render ─── */
@@ -1799,13 +1799,13 @@ export default function LiveBookingBot() {
       </div>
 
       <h2 className="font-heading text-3xl md:text-5xl text-white tracking-wide leading-tight">
-        THE LIVE BOOKING BOT
+        THE LIVE BOOKING BOT 🔥
       </h2>
       <p className="mt-3 text-dojo-gold font-mono text-xs uppercase tracking-[0.25em]">
-        A behavioral conversion system. Not a chatbot.
+        A behavioral conversion system. Not just a chatbot. 💎
       </p>
       <p className="mt-4 text-gray-400 max-w-2xl leading-relaxed">
-        Talk to it like you would a real student. Try hostile inputs. Try nervous ones. Ask for a human. Come back tomorrow and watch it remember you. This is the exact flow a prospective student hits when they DM your Instagram at 11 PM on a Saturday — when your front desk has been closed for <strong className="text-white">{minutesToHuman(frontDeskMin)}</strong>.
+        Talk to it like a real prospective student. Try hostile inputs. 😤 Try nervous ones. 😰 Ask for a human. 👤 Come back tomorrow and watch it remember you like an old friend. 🧠✨ This is the EXACT flow a prospective student hits when they DM your Instagram at 11 PM on a Saturday — when your front desk has been closed for <strong className="text-white">{minutesToHuman(frontDeskMin)}</strong>. 🔥
       </p>
 
       <div className="mt-8 rounded-2xl border border-dojo-gold/20 bg-dojo-dark/80 backdrop-blur-sm overflow-hidden">
@@ -1842,12 +1842,12 @@ export default function LiveBookingBot() {
         <div className="px-6 py-3 bg-gradient-to-r from-dojo-red/5 via-transparent to-dojo-gold/5 border-b border-white/5 flex items-center justify-between text-[10px] font-mono uppercase tracking-widest flex-wrap gap-2">
           <span className="text-dojo-red">
             ✕ Front desk: {clock.frontDeskOpen
-              ? `Open · honest baseline ${(frontDeskBaselineMs / 60000).toFixed(0)} min`
-              : `CLOSED · reopens in ${minutesToHuman(frontDeskMin)}`}
+              ? `Open · honest baseline ${(frontDeskBaselineMs / 60000).toFixed(0)} min 🐢`
+              : `CLOSED 💤 · reopens in ${minutesToHuman(frontDeskMin)}`}
           </span>
           <span className="text-gray-600">vs</span>
           <span className="text-dojo-gold">
-            ✓ MatBoss bot: {avgResponseMs > 0 ? `${(avgResponseMs / 1000).toFixed(2)}s avg reply` : 'online now · instant'}
+            ✓ MatBoss bot 🔥: {avgResponseMs > 0 ? `${(avgResponseMs / 1000).toFixed(2)}s avg reply ⚡` : 'ONLINE NOW · instant ⚡'}
           </span>
         </div>
 
@@ -1888,7 +1888,7 @@ export default function LiveBookingBot() {
               <input
                 value={input}
                 onChange={e => setInput(e.target.value)}
-                placeholder="Try: 'Is BJJ safe for my 8 year old?' or just say hi..."
+                placeholder="🔥 Try: 'Is BJJ safe for my 8 year old?' or just say hi!"
                 className="flex-1 rounded-full bg-dojo-carbon border border-white/10 px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-dojo-gold"
               />
               <button
@@ -1918,7 +1918,7 @@ export default function LiveBookingBot() {
                 />
                 {!clock.frontDeskOpen && (
                   <div className="text-[9px] font-mono text-dojo-red bg-dojo-red/10 border border-dojo-red/20 rounded p-2 leading-relaxed">
-                    It's {clock.clock12.replace(/:\d\d (AM|PM)$/, ' $1')} {clock.tzLabel}. Your competitors' front desks reopen in {minutesToHuman(frontDeskMin)}. This bot just answered in {avgResponseMs > 0 ? `${(avgResponseMs / 1000).toFixed(2)}s` : 'under 2 seconds'}.
+                    🔥 It's {clock.clock12.replace(/:\d\d (AM|PM)$/, ' $1')} {clock.tzLabel}. Your competitors' front desks reopen in {minutesToHuman(frontDeskMin)} ⏳. This bot just answered in {avgResponseMs > 0 ? `${(avgResponseMs / 1000).toFixed(2)}s` : 'under 2 seconds'}. ⚡💎
                   </div>
                 )}
               </div>
@@ -1959,7 +1959,7 @@ export default function LiveBookingBot() {
               {state.hotLead && (
                 <div className="mt-3 p-2 rounded bg-dojo-red/10 border border-dojo-red/30 text-center">
                   <div className="text-[9px] font-mono text-dojo-red uppercase tracking-widest animate-pulse">
-                    🔥 HOT LEAD · Silently pulling in Carlos
+                    🔥🚨 HOT LEAD · Silently pulling in Carlos 👑
                   </div>
                 </div>
               )}
@@ -1969,7 +1969,7 @@ export default function LiveBookingBot() {
               onClick={reset}
               className="w-full text-[10px] font-mono text-gray-500 hover:text-white border border-white/10 hover:border-dojo-gold/40 rounded py-2 uppercase tracking-widest transition-all"
             >
-              ↻ Reset + Clear Memory
+              ↻ Reset + Clear Memory 🔄
             </button>
           </div>
         </div>
@@ -2007,7 +2007,7 @@ function MessageBubble({
             <div className="w-2 h-2 rounded-full bg-green-400 animate-bounce" style={{ animationDelay: '0ms' }} />
             <div className="w-2 h-2 rounded-full bg-green-400 animate-bounce" style={{ animationDelay: '150ms' }} />
             <div className="w-2 h-2 rounded-full bg-green-400 animate-bounce" style={{ animationDelay: '300ms' }} />
-            <span className="ml-2 text-[10px] font-mono text-green-400 uppercase tracking-widest">Carlos is typing...</span>
+            <span className="ml-2 text-[10px] font-mono text-green-400 uppercase tracking-widest">🥋 Carlos is typing... ✨</span>
           </div>
         </div>
       );
@@ -2018,7 +2018,7 @@ function MessageBubble({
         <div className="flex-1 max-w-[85%]">
           <div className="bg-green-900/10 border border-green-500/30 rounded-2xl rounded-bl-md p-4">
             <div className="text-[9px] font-mono text-green-400 uppercase tracking-widest mb-2">
-              👤 Human · Carlos (Head Instructor) · Shadow Mode
+              👤🏆 Human · Carlos (Head Instructor) · Shadow Mode ✨
             </div>
             <div className="text-sm text-white leading-relaxed">{message.text}</div>
           </div>
@@ -2034,12 +2034,12 @@ function MessageBubble({
         <div className="flex-1 max-w-[90%]">
           <div className="bg-gradient-to-br from-green-500/10 to-green-500/5 border border-green-500/30 rounded-2xl rounded-bl-md p-4">
             <div className="text-[9px] font-mono text-green-400 uppercase tracking-widest mb-2">
-              ✓ Booking Confirmed
+              ✅🎉 Booking CONFIRMED · You're LOCKED IN 🔒
             </div>
             <div className="text-sm text-white leading-relaxed">{message.text}</div>
             {message.tldr && (
               <div className="mt-3 pt-3 border-t border-green-500/20">
-                <div className="text-[9px] font-mono text-dojo-gold uppercase tracking-widest mb-1">Handoff summary → owner dashboard</div>
+                <div className="text-[9px] font-mono text-dojo-gold uppercase tracking-widest mb-1">📨 Handoff summary → owner dashboard 👑</div>
                 <div className="text-[11px] text-gray-300 font-mono">{message.tldr}</div>
               </div>
             )}
@@ -2056,7 +2056,7 @@ function MessageBubble({
         <div className="flex-1 max-w-[85%]">
           <div className="bg-gradient-to-br from-dojo-gold/10 to-dojo-gold/5 border border-dojo-gold/30 rounded-2xl rounded-bl-md p-4">
             <div className="text-[9px] font-mono text-dojo-gold uppercase tracking-widest mb-2">
-              ✦ Returning visitor detected
+              ✨🔁 Returning visitor DETECTED · Welcome home 🏠
             </div>
             <div className="text-sm text-white leading-relaxed mb-3">{message.text}</div>
             {message.quickReplies && (
@@ -2078,7 +2078,7 @@ function MessageBubble({
       <div className="flex gap-2">
         <BotAvatar />
         <div className="max-w-[85%] bg-dojo-carbon border-l-2 border-dojo-gold rounded-2xl rounded-bl-md p-4">
-          <div className="text-[10px] font-mono text-dojo-gold uppercase tracking-widest mb-2">📊 Microproof</div>
+          <div className="text-[10px] font-mono text-dojo-gold uppercase tracking-widest mb-2">📊🔥 Microproof · Receipts 💎</div>
           <div className="text-sm text-white font-semibold mb-1">{title}</div>
           <div className="text-xs text-gray-300 leading-relaxed">{rest.join('\n')}</div>
         </div>
@@ -2091,7 +2091,7 @@ function MessageBubble({
       <div className="flex gap-2">
         <BotAvatar />
         <div className="max-w-[85%] bg-dojo-dark border border-dojo-gold/20 rounded-2xl rounded-bl-md p-4">
-          <div className="text-[10px] font-mono text-dojo-gold uppercase tracking-widest mb-2">🎯 Preempt</div>
+          <div className="text-[10px] font-mono text-dojo-gold uppercase tracking-widest mb-2">🎯🧠 Preempt · Reading minds ✨</div>
           <div className="text-sm text-white leading-relaxed">{message.text}</div>
         </div>
       </div>
@@ -2103,7 +2103,7 @@ function MessageBubble({
       <div className="flex gap-2">
         <BotAvatar />
         <div className="max-w-[85%] bg-blue-500/5 border border-blue-500/20 rounded-2xl rounded-bl-md p-4">
-          <div className="text-[10px] font-mono text-blue-400 uppercase tracking-widest mb-2">💙 Empathy beat</div>
+          <div className="text-[10px] font-mono text-blue-400 uppercase tracking-widest mb-2">💙🫂 Empathy beat · I got you 🤝</div>
           <div className="text-sm text-white leading-relaxed">{message.text}</div>
         </div>
       </div>
@@ -2116,7 +2116,7 @@ function MessageBubble({
         <BotAvatar />
         <div className="max-w-[85%]">
           <div className="bg-dojo-carbon border border-dojo-gold/20 rounded-2xl rounded-bl-md px-4 py-3">
-            <div className="text-[9px] font-mono text-dojo-gold uppercase tracking-widest mb-2">❓ Clarification ladder</div>
+            <div className="text-[9px] font-mono text-dojo-gold uppercase tracking-widest mb-2">❓💎 Clarification ladder · Getting you RIGHT 🎯</div>
             <div className="text-sm text-white mb-3">{message.text}</div>
             {message.quickReplies && (
               <div className="flex flex-wrap gap-2">
@@ -2138,12 +2138,12 @@ function MessageBubble({
         <div className="flex-1 max-w-[85%]">
           <div className="bg-gradient-to-br from-dojo-gold/10 to-dojo-gold/5 border border-dojo-gold/30 rounded-2xl rounded-bl-md p-4">
             <div className="text-[9px] font-mono text-dojo-gold uppercase tracking-widest mb-2">
-              ⚡ Flagged for human handoff
+              ⚡🚨 Flagged for HUMAN HANDOFF · Carlos is inbound 👑
             </div>
             <div className="text-sm text-white leading-relaxed">{message.text}</div>
             {message.tldr && (
               <div className="mt-3 pt-3 border-t border-dojo-gold/20">
-                <div className="text-[9px] font-mono text-dojo-red uppercase tracking-widest mb-1">Sent to Carlos's inbox</div>
+                <div className="text-[9px] font-mono text-dojo-red uppercase tracking-widest mb-1">📨🔥 Sent to Carlos's inbox · Priority ⚡</div>
                 <div className="text-[11px] text-gray-300 font-mono">{message.tldr}</div>
               </div>
             )}
@@ -2206,7 +2206,7 @@ function MessageBubble({
         <div className="flex-1 max-w-[85%]">
           <div className="bg-gradient-to-br from-dojo-gold/5 to-dojo-red/5 border border-dojo-gold/20 rounded-2xl rounded-bl-md p-4">
             <div className="text-[9px] font-mono text-dojo-gold uppercase tracking-widest mb-2">
-              ✨ Post-booking nurture
+              ✨🎁 Post-booking nurture · VIP treatment 👑
             </div>
             <div className="text-sm text-white leading-relaxed mb-3">{message.text}</div>
             {message.quickReplies && (
@@ -2280,22 +2280,22 @@ function SlotCard({ slot, highlighted, onPick }: { slot: ScheduleSlot; highlight
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1 flex-wrap">
             <span className="font-semibold text-sm text-white">{slot.day} · {slot.time}</span>
-            {highlighted && <span className="text-[8px] font-mono text-dojo-gold uppercase tracking-widest">◆ Best match</span>}
+            {highlighted && <span className="text-[8px] font-mono text-dojo-gold uppercase tracking-widest">◆💎 BEST match ✨</span>}
           </div>
-          <div className="text-[11px] text-gray-400">{slot.label} · {slot.location}</div>
+          <div className="text-[11px] text-gray-400">{slot.label} · 📍 {slot.location}</div>
           <div className="mt-2 flex items-center gap-3 text-[9px] font-mono uppercase tracking-widest flex-wrap">
             {scarcity && (
-              <span className="text-dojo-red animate-pulse">🔥 {slot.spotsLeft} left</span>
+              <span className="text-dojo-red animate-pulse">🔥 Only {slot.spotsLeft} left!</span>
             )}
             {!scarcity && slot.spotsLeft > 0 && (
-              <span className="text-gray-500">{slot.spotsLeft} spots</span>
+              <span className="text-gray-500">✅ {slot.spotsLeft} spots</span>
             )}
-            <span className="text-gray-600">{slot.viewers} viewing</span>
-            <span className="text-green-500">{slot.recentSignups} booked this week</span>
+            <span className="text-gray-600">👀 {slot.viewers} viewing</span>
+            <span className="text-green-500">⚡ {slot.recentSignups} booked this week</span>
           </div>
         </div>
         <div className="text-dojo-gold font-mono text-[9px] whitespace-nowrap">
-          {slot.spotsLeft === 0 ? 'FULL' : 'TAP →'}
+          {slot.spotsLeft === 0 ? '😱 FULL' : '🔒 TAP →'}
         </div>
       </div>
     </button>
