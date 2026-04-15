@@ -29,6 +29,44 @@ export type Block =
 // this converts each block to markdown-style strings so the string-based parser can handle
 // them uniformly.
 
+/**
+ * If `value` is a JSON-encoded array of block objects (or a single block object),
+ * parse and expand it into markdown lines. Returns null if it isn't such a payload.
+ *
+ * Handles the case where an ingester posts content as a stringified JSON array
+ * instead of a real array — we'd otherwise render the raw JSON as a paragraph.
+ */
+export function expandJsonBlockString(value: string): string[] | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const first = trimmed[0];
+  if (first !== '[' && first !== '{') return null;
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(trimmed);
+  } catch {
+    return null;
+  }
+
+  const items = Array.isArray(parsed) ? parsed : [parsed];
+  const lines: string[] = [];
+  let matched = false;
+
+  for (const item of items) {
+    if (typeof item === 'string') {
+      lines.push(item);
+    } else if (item && typeof item === 'object' && 'type' in item) {
+      matched = true;
+      lines.push(...blockObjectToLines(item as Record<string, unknown>));
+    } else {
+      return null;
+    }
+  }
+
+  return matched ? lines : null;
+}
+
 export function blockObjectToLines(obj: Record<string, unknown>): string[] {
   const blockType = obj.type;
   if (typeof blockType !== 'string') return [];
@@ -158,9 +196,19 @@ function classifyLine(line: string): ClassifiedLine {
 export function parseContent(content: string[]): Block[] {
   const blocks: Block[] = [];
 
+  const expanded: string[] = [];
+  for (const line of content) {
+    const fromJson = expandJsonBlockString(line);
+    if (fromJson) {
+      expanded.push(...fromJson);
+    } else {
+      expanded.push(line);
+    }
+  }
+
   let i = 0;
-  while (i < content.length) {
-    const classified = classifyLine(content[i]);
+  while (i < expanded.length) {
+    const classified = classifyLine(expanded[i]);
 
     switch (classified.kind) {
       case LineKind.H2:
@@ -186,8 +234,8 @@ export function parseContent(content: string[]): Block[] {
       // Group consecutive unordered list items
       case LineKind.UL: {
         const items: string[] = [];
-        while (i < content.length && classifyLine(content[i]).kind === LineKind.UL) {
-          items.push(classifyLine(content[i]).payload);
+        while (i < expanded.length && classifyLine(expanded[i]).kind === LineKind.UL) {
+          items.push(classifyLine(expanded[i]).payload);
           i++;
         }
         blocks.push({ type: 'ul', items });
@@ -197,8 +245,8 @@ export function parseContent(content: string[]): Block[] {
       // Group consecutive ordered list items
       case LineKind.OL: {
         const items: string[] = [];
-        while (i < content.length && classifyLine(content[i]).kind === LineKind.OL) {
-          items.push(classifyLine(content[i]).payload);
+        while (i < expanded.length && classifyLine(expanded[i]).kind === LineKind.OL) {
+          items.push(classifyLine(expanded[i]).payload);
           i++;
         }
         blocks.push({ type: 'ol', items });
@@ -208,8 +256,8 @@ export function parseContent(content: string[]): Block[] {
       // Group consecutive table rows: first row = header, skip separator, rest = body
       case LineKind.TableRow: {
         const rawRows: string[] = [];
-        while (i < content.length && classifyLine(content[i]).kind === LineKind.TableRow) {
-          rawRows.push(content[i]);
+        while (i < expanded.length && classifyLine(expanded[i]).kind === LineKind.TableRow) {
+          rawRows.push(expanded[i]);
           i++;
         }
         // Need at least a header row

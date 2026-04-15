@@ -1,7 +1,7 @@
 import type { Context } from '@netlify/functions';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { blogCategories, type BlogPost } from '../../src/data/posts';
-import { blockObjectToLines } from '../../src/lib/contentParser';
+import { blockObjectToLines, expandJsonBlockString } from '../../src/lib/contentParser';
 import { getDatabaseErrorCode, loadMergedBlogPosts, saveBlogPost } from './blog-store';
 
 const JSON_HEADERS = {
@@ -118,7 +118,13 @@ function normalizeContent(value: unknown): string[] | null {
     for (const item of value) {
       if (typeof item === 'string') {
         const trimmed = item.trim();
-        if (trimmed) normalized.push(trimmed);
+        if (!trimmed) continue;
+        const expanded = expandJsonBlockString(trimmed);
+        if (expanded) {
+          normalized.push(...expanded);
+        } else {
+          normalized.push(trimmed);
+        }
       } else if (typeof item === 'object' && item !== null && 'type' in item) {
         normalized.push(...blockObjectToLines(item as Record<string, unknown>));
       }
@@ -128,6 +134,11 @@ function normalizeContent(value: unknown): string[] | null {
   }
 
   if (typeof value === 'string') {
+    const expanded = expandJsonBlockString(value);
+    if (expanded) {
+      return expanded.length > 0 ? expanded : null;
+    }
+
     const normalized = value
       .split(/\r?\n\r?\n/)
       .map((item) => item.trim())

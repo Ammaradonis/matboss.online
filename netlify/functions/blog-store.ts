@@ -1,6 +1,6 @@
 import pool from './db';
 import { mergePosts, posts as staticPosts, type BlogPost } from '../../src/data/posts';
-import { blockObjectToLines } from '../../src/lib/contentParser';
+import { blockObjectToLines, expandJsonBlockString } from '../../src/lib/contentParser';
 
 export const SITE_URL = 'https://matboss.online';
 export const BLOG_PUBLICATION_NAME = 'MatBoss';
@@ -126,10 +126,22 @@ export function mapRowToStoredPost(row: Record<string, unknown>): StoredBlogPost
   if (Array.isArray(row.content)) {
     for (const item of row.content) {
       if (typeof item === 'string') {
-        content.push(item);
+        const expanded = expandJsonBlockString(item);
+        if (expanded) {
+          content.push(...expanded);
+        } else {
+          content.push(item);
+        }
       } else if (typeof item === 'object' && item !== null && 'type' in item) {
         content.push(...blockObjectToLines(item as Record<string, unknown>));
       }
+    }
+  } else if (typeof row.content === 'string') {
+    const expanded = expandJsonBlockString(row.content);
+    if (expanded) {
+      content.push(...expanded);
+    } else {
+      content.push(row.content);
     }
   }
 

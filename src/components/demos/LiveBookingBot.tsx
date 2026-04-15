@@ -700,6 +700,9 @@ export default function LiveBookingBot() {
   const hiddenAtRef = useRef<number | null>(null);
   const bootedRef = useRef(false);
   const sessionIdRef = useRef(`local-${Math.random().toString(36).slice(2, 8)}`);
+  const hasEscalatedRef = useRef(false);
+  const hasShownIdleNudgeRef = useRef(false);
+  const postEscalationTurnRef = useRef(0);
 
   /* ─── Persist on every change ─── */
   useEffect(() => {
@@ -777,8 +780,10 @@ export default function LiveBookingBot() {
   /* ─── Sunk cost re-engagement (45s idle at schedule step) ─── */
   useEffect(() => {
     if (state.step !== 'schedule' || state.step === undefined) return;
+    if (hasShownIdleNudgeRef.current || hasEscalatedRef.current) return;
     if (idleTimerRef.current) window.clearTimeout(idleTimerRef.current);
     idleTimerRef.current = window.setTimeout(() => {
+      if (hasShownIdleNudgeRef.current || hasEscalatedRef.current) return;
       if (Date.now() - lastActivityAt >= 44000) {
         const featuredSlot = lastOfferedSlots[0] || slots[0];
         pushBot({
@@ -786,6 +791,7 @@ export default function LiveBookingBot() {
           text: `👋🔥 Hey — still with me, legend?! 💎 I see you vibing with the slots and I RESPECT that energy! ✨ Want me to HOLD one for 10 whole minutes while you lock it in mentally?! 🔒⏰ The ${featuredSlot?.day} ${featuredSlot?.time} slot at ${featuredSlot?.location} only has ${featuredSlot?.spotsLeft} spots left and it's moving FAST — just say the word! 🚀💪`,
         });
         setMemory(m => ({ ...m, hesitations: m.hesitations + 1 }));
+        hasShownIdleNudgeRef.current = true;
       }
     }, 45000) as unknown as number;
     return () => {
@@ -803,6 +809,7 @@ export default function LiveBookingBot() {
 
       if (
         state.step === 'schedule'
+        && !hasEscalatedRef.current
         && hiddenAtRef.current
         && Date.now() - hiddenAtRef.current >= 45000
       ) {
@@ -1000,7 +1007,33 @@ export default function LiveBookingBot() {
     currentMemory: MemoryLayer,
     currentState: ConversationState
   ) => {
-    // Escalation checks FIRST
+    // Post-booking owns its own lane — never re-escalate a closed deal
+    if (currentState.step === 'post-booking') {
+      handlePostBookingResponse(userText, currentState.bookedSlot);
+      return;
+    }
+
+    // Already handed off to Carlos — route all follow-ups through the post-escalation lane
+    if (currentState.step === 'escalate' || currentState.humanShadowActive || hasEscalatedRef.current) {
+      if (/callback|call me|text is better|keep chatting/i.test(userText)) {
+        handleEscalationPreference(userText);
+        return;
+      }
+      if (
+        (newEntities.phone || newEntities.email)
+        && (newEntities.phone !== entities.phone || newEntities.email !== entities.email)
+      ) {
+        pushBot({
+          kind: 'text',
+          text: `🎯💎 FLAWLESS — I just pinned ${newEntities.phone || newEntities.email} to Carlos's handoff dossier like a digital tattoo! 🔒✨ He's going to reach out through the EXACT channel you prefer — red-carpet treatment, baby! 🏆🔥 This is the elite concierge experience in ACTION! 💪⚡`,
+        });
+        return;
+      }
+      handlePostEscalationChat(userText, newEntities, currentMemory);
+      return;
+    }
+
+    // Fresh escalation trigger — only when we haven't already flagged Carlos
     if (
       topIntent?.intent === 'escalate:human'
       || currentMemory.confidenceScore < 0.45
@@ -1012,28 +1045,6 @@ export default function LiveBookingBot() {
         'The user needs a human — self-diagnosed low confidence or repeated objections.',
         { ents: newEntities, mem: currentMemory, convo: currentState }
       );
-      return;
-    }
-
-    if (currentState.step === 'post-booking') {
-      handlePostBookingResponse(userText, currentState.bookedSlot);
-      return;
-    }
-
-    if (currentState.step === 'escalate' && /callback|call me|text is better|keep chatting/i.test(userText)) {
-      handleEscalationPreference(userText);
-      return;
-    }
-
-    if (
-      currentState.step === 'escalate'
-      && (newEntities.phone || newEntities.email)
-      && (newEntities.phone !== entities.phone || newEntities.email !== entities.email)
-    ) {
-      pushBot({
-        kind: 'text',
-        text: `🎯💎 FLAWLESS — I just pinned ${newEntities.phone || newEntities.email} to Carlos's handoff dossier like a digital tattoo! 🔒✨ He's going to reach out through the EXACT channel you prefer — red-carpet treatment, baby! 🏆🔥 This is the elite concierge experience in ACTION! 💪⚡`,
-      });
       return;
     }
 
@@ -1570,6 +1581,74 @@ export default function LiveBookingBot() {
     });
   };
 
+  /* ─── Post-escalation chat — memory-aware, zero repetition ─── */
+  const handlePostEscalationChat = (
+    userText: string,
+    entitiesNow: Entities,
+    memoryNow: MemoryLayer
+  ) => {
+    const turn = postEscalationTurnRef.current++;
+    const name = entitiesNow.name || entities.name;
+    const art = entitiesNow.art || entities.art;
+    const objections = (memoryNow.objections.length ? memoryNow.objections : memory.objections).slice(0, 2);
+    const firstObjection = objections[0];
+    const slot = state.bookedSlot;
+
+    if (/thank|thanks|appreciate|cool|awesome|great|perfect|nice/i.test(userText)) {
+      pushBot({
+        kind: 'text',
+        text: `💎🙌 ${name ? name + ', this ' : 'This '}is exactly why we do what we do! 🔥 Carlos is queued up with your full dossier${art ? ` — your ${art} interest is pinned at the top` : ''}${firstObjection ? ` and I already flagged your ${firstObjection} note so he leads with that` : ''}. 👑✨ Sit tight — he moves fast! ⚡`,
+      });
+      return;
+    }
+
+    if (/when|how long|time|wait/i.test(userText)) {
+      pushBot({
+        kind: 'text',
+        text: `⏱️💎 Carlos's typical callback window is 30 minutes or less${clock.frontDeskOpen ? " — front desk is LIVE right now so you're getting priority treatment" : clock.minutesUntilFrontDeskOpen ? ` — desk opens in ${minutesToHuman(clock.minutesUntilFrontDeskOpen)} and you're first in his queue` : ''}! 🎯🔥 ${name ? name + ', you' : 'You'}'re not waiting in any line, legend. 👑`,
+      });
+      return;
+    }
+
+    if (/price|cost|how much|fee/i.test(userText)) {
+      pushBot({
+        kind: 'text',
+        text: `💎🤝 Pricing is 100% Carlos's lane — he tailors it to your exact goals${art ? ` (${art} intro pricing has options I don't even have access to)` : ''}! 🔥 I pinned the question to the top of the handoff so he leads with a straight answer. ✨ No runaround — that's the PCMA way! 🏆`,
+      });
+      return;
+    }
+
+    if (/cancel|nevermind|never mind|stop|undo/i.test(userText)) {
+      pushBot({
+        kind: 'text',
+        text: `🤝💎 Totally heard — I'll flag "paused, no rush" on the handoff thread so Carlos knows to go soft. 🕊️✨ If you change your mind even a week from now, just text the dojo and we pick up ${name ? 'right where we left off, ' + name : 'exactly where we paused'}. 🔥 Zero pressure, always. 👑`,
+      });
+      return;
+    }
+
+    if (slot && /parking|directions|address|where/i.test(userText)) {
+      pushBot({
+        kind: 'text',
+        text: `🗺️💎 Your class is ${slot.day} at ${slot.location} — Carlos will text the parking cheat-sheet with your confirmation! 🚗✨ Side-street backup included because we don't do stress! 🔥`,
+      });
+      return;
+    }
+
+    // Rotating "Carlos inbound" variants — never repeat the same line
+    const variants = [
+      `🎯💎 Noted and pinned to the dossier, ${name || 'legend'}! 🔒✨ Carlos has your full thread${art ? ` + the ${art} angle` : ''}${firstObjection ? ` + your ${firstObjection} flag` : ''} — anything else you want queued up while you wait? 🔥`,
+      `🔥✨ Logged${name ? ', ' + name : ''} — I'm adding every new detail to Carlos's briefing in real time so he hits the ground SPRINTING. 🏃‍♂️💨 What else is on your mind? 💎`,
+      `💎👑 Keep 'em coming — every note here lands on Carlos's screen BEFORE he calls${name ? ', ' + name : ''}, so the more context the better the conversation. 🎯 Fire away! 🔥`,
+      `🙌💥 Got it locked${art ? ` — your ${art} thread just got deeper` : ''}! Carlos sees all of this. 📲✨ Anything specific you want him to address FIRST when he reaches out? 🎯`,
+      `⚡💎 Pinned. Carlos is in-queue and he moves FAST${name ? ', ' + name : ''}. 🏆 Want me to pre-send you any resources (parking map, gear list, schedule PDF) while you wait? 🔥`,
+    ];
+    const pick = variants[turn % variants.length];
+    pushBot({
+      kind: 'text',
+      text: pick,
+    });
+  };
+
   const handlePostBookingResponse = (userText: string, slot?: ScheduleSlot) => {
     if (/warm-up video/i.test(userText)) {
       pushBot({
@@ -1675,6 +1754,10 @@ export default function LiveBookingBot() {
     internalReason: string,
     overrides?: { ents?: Entities; mem?: MemoryLayer; convo?: ConversationState }
   ) => {
+    // Hard guard — never escalate twice in one session
+    if (hasEscalatedRef.current) return;
+    hasEscalatedRef.current = true;
+
     const summaryEntities = overrides?.ents ?? entities;
     const summaryMemory = overrides?.mem ?? memory;
     const summaryState = overrides?.convo ?? state;
@@ -1710,9 +1793,27 @@ export default function LiveBookingBot() {
 
     window.setTimeout(() => {
       setMessages(prev => prev.filter(m => m.kind !== 'typing'));
+      const carlosName = summaryEntities.name ? `${summaryEntities.name}, ` : '';
+      const artHook = summaryEntities.art
+        ? ` Saw you're eyeing ${summaryEntities.art} — I teach that program personally so you're talking to the right guy.`
+        : '';
+      const kidHook = summaryEntities.audienceType === 'parent'
+        ? ` And as a parent myself, I totally get the research mode you're in — zero pressure from me.`
+        : '';
+      const expHook = summaryEntities.experience === 'Beginner'
+        ? ` 80% of our members started as total beginners — you'd fit right in.`
+        : summaryEntities.experience === 'Experienced'
+          ? ` Since you've got mat experience already, I'll skip the 101 stuff and get into the real conversation.`
+          : '';
+      const objHook = summaryMemory.objections.length
+        ? ` I've already flagged your ${summaryMemory.objections.slice(0, 2).join(' and ')} concern${summaryMemory.objections.length > 1 ? 's' : ''} so I lead with that when we talk.`
+        : '';
+      const slotHook = summaryState.bookedSlot
+        ? ` I see you locked in ${summaryState.bookedSlot.day} ${summaryState.bookedSlot.time} — I'll be there personally to greet you.`
+        : '';
       pushHuman({
         kind: 'human-shadow',
-        text: `👊🔥 Hey — Carlos here, head instructor! 💪 Just got flagged in by the bot, saw your full thread and I'm ALREADY on it! 🎯✨ ${entities.name ? entities.name + ', ' : ''}I'll text you personally in the next 30 minutes from (619) 555-0142 — zero pressure, zero sales vibes, just want to make absolutely SURE you get the right info and feel 100% taken care of! 🤝💎 This is personal now! 🏆`,
+        text: `👊🔥 Hey — Carlos here, head instructor! 💪 Just got flagged in by the bot and I'm already on it. 🎯✨ ${carlosName}I'll text you personally in the next 30 minutes from (619) 555-0142.${artHook}${kidHook}${expHook}${objHook}${slotHook} 🤝💎 Zero pressure, zero sales vibes — this is personal now. 🏆`,
       });
     }, 5800);
 
@@ -1757,6 +1858,9 @@ export default function LiveBookingBot() {
     nextId.current = 1;
     sessionIdRef.current = `local-${Math.random().toString(36).slice(2, 8)}`;
     bootedRef.current = false;
+    hasEscalatedRef.current = false;
+    hasShownIdleNudgeRef.current = false;
+    postEscalationTurnRef.current = 0;
     window.setTimeout(() => {
       pushBot({
         kind: 'quick-replies',
