@@ -40,6 +40,38 @@ export const categoryColors: Record<BlogPost['category'], string> = {
 
 export const posts: BlogPost[] = [
   {
+    id: 'post-010',
+    slug: 'matboss-official-website-by-ammar-alkheder-vs-gymdesk-which-system-actually-incr',
+    category: 'market',
+    title: 'MatBoss Official Website by Ammar Alkheder vs Gymdesk: Which System Actually Increases Martial Arts Enrollments?',
+    headline: 'MATBOSS OFFICIAL WEBSITE BY AMMAR ALKHEDER VS GYMDESK: WHICH SYSTEM ACTUALLY INCREASES MARTIAL ARTS ENROLLMENTS?',
+    excerpt: 'New analysis: MatBoss Official Website by Ammar Alkheder vs Gymdesk: Which System Actually Increases Martial Arts Enrollments?. Read the full breakdown on MatBoss News.',
+    date: '2024-12-23',
+    thumbnail: '/news/thumbnails/matboss-official-website-by-ammar-alkheder-vs-gymdesk-which-system-actually-incr.svg',
+    readTime: '5 min',
+    content: [
+      'This is a new post. Edit the content in src/data/posts.ts to replace this placeholder.',
+      '## Section Heading',
+      'Add your analysis, data, and insights here.',
+    ],
+  },
+  {
+    id: 'post-009',
+    slug: 'matboss-official-website-by-ammar-alkheder-vs-pushpress-which-system-actually-in',
+    category: 'market',
+    title: 'MatBoss Official Website by Ammar Alkheder vs PushPress: Which System Actually Increases Martial Arts Enrollments?',
+    headline: 'MATBOSS OFFICIAL WEBSITE BY AMMAR ALKHEDER VS PUSHPRESS: WHICH SYSTEM ACTUALLY INCREASES MARTIAL ARTS ENROLLMENTS?',
+    excerpt: 'New analysis: MatBoss Official Website by Ammar Alkheder vs PushPress: Which System Actually Increases Martial Arts Enrollments?. Read the full breakdown on MatBoss News.',
+    date: '2024-12-22',
+    thumbnail: '/news/thumbnails/matboss-official-website-by-ammar-alkheder-vs-pushpress-which-system-actually-in.svg',
+    readTime: '5 min',
+    content: [
+      'This is a new post. Edit the content in src/data/posts.ts to replace this placeholder.',
+      '## Section Heading',
+      'Add your analysis, data, and insights here.',
+    ],
+  },
+  {
     id: 'post-008',
     slug: 'matboss-official-website-by-ammar-alkheder-vs-kicksite-which-system-actually-inc',
     category: 'market',
