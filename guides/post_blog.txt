@@ -1,7 +1,8 @@
 How to Post to the Blog
 
-node scripts/new-post.cjs --title "MatBoss vs GymMaster: Which System Actually Increases Martial Arts Enrollments?" --category market --date 2024-12-19
+https://search.google.com/test/rich-results
 
+node scripts/new-post.cjs --title "MatBoss Official Website by Ammar Alkheder vs Kicksite: Which System Actually Increases Martial Arts Enrollments?" --category market --date 2024-12-21
 
 There is no special id pattern right now.
 

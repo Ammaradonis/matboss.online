@@ -2,8 +2,9 @@ import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useSanDiegoClock, formatSDTimestamp, minutesToHuman, sdNow } from './sdTime';
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   THE MATBOSS LIVE BOOKING BOT — Behavioral Conversion System
-   Implements 25 hyper-smart enhancements:
+   THE MATBOSS LIVE BOOKING BOT — Behavioral Conversion System v2.0 🔥💎
+   Implements 49 hyper-smart enhancements (25 original + 24 rocket boosters):
+   ORIGINAL 25:
    1. Confidence-scored multi-intent detection
    2. Semantic similarity fallback (token-overlap scoring)
    3. Entity memory extraction + skip-known-fields
@@ -29,6 +30,31 @@ import { useSanDiegoClock, formatSDTimestamp, minutesToHuman, sdNow } from './sd
   23. Response-time honesty meter (live SD-time aware baseline)
   24. Intent-aware handoff TL;DR summary
   25. Returning visitor rehydration ("Welcome back, still thinking...")
+   ROCKET BOOSTERS (26-49):
+  26. Utility-score conversation state optimizer (lowest-friction next action)
+  27. Objection decay + resurfacing engine (concerns fade over time)
+  28. Slot show-up fit predictor (commute friction, commitment-by-hour, dropout risk)
+  29. Multi-turn intent arbitration (clarify/answer/preempt/book/parallel)
+  30. Churn-risk vs conversion-readiness dual prediction
+  31. Personalized post-booking reason-memory nurture
+  32. Predictive calendar availability share
+  33. Real-time social proof activity feed (live injected events)
+  34. Sentiment-adaptive conversational pacing (fast for excited, slow for nervous)
+  35. Self-optimizing A/B rebuttal library (3 variants per objection)
+  36. Hyper-local 1-mile geo-fence "Local Legend" offer
+  37. Three-strike idle re-engagement sequence (45s/3m/5m escalation)
+  38. Reinforcement scoring loop (response patterns → outcomes)
+  39. Psychological persona modeling (risk-averse, status-driven, logical, emotional)
+  40. Dynamic narrative micro-stories engine
+  41. Drop-off prediction + preemptive intervention
+  42. Parallel multi-intent answering (answer both + advance funnel)
+  43. Momentum Lock commitment amplifier
+  44. User-pace mirror adaptive delay engine
+  45. Objection graph + cycle breaker
+  46. Archetype clustering (4 Warrior Personas)
+  47. Mental Mat Tour vivid pre-experience trigger
+  48. Self-improving intent memory (session replay learning)
+  49. Time-to-class decay + predictive nurture checkpoints
    ═══════════════════════════════════════════════════════════════════════════ */
 
 type Sender = 'bot' | 'user' | 'human';
@@ -45,13 +71,29 @@ type MessageKind =
   | 'rehydrate'
   | 'typing'
   | 'microproof'
-  | 'preempt';
+  | 'preempt'
+  | 'mat-tour'
+  | 'live-activity'
+  | 'neighborhood-offer'
+  | 'story'
+  | 'cycle-breaker'
+  | 'momentum-lock'
+  | 'drop-off-save'
+  | 'parallel-answer'
+  | 'calendar-share'
+  | 'nurture-checkpoint';
 
 type Mode = 'explore' | 'assist' | 'close';
 type GeoStatus = 'unknown' | 'local' | 'non-local' | 'shared' | 'denied';
 type TravelMode = 'local' | 'visitor' | 'virtual';
 
 type ObjectionKey = 'price' | 'safety' | 'wear' | 'time' | 'insurance' | 'kid-safety';
+
+type Archetype = 'NervousNewbie' | 'BusyParent' | 'EagerAthlete' | 'SkepticalShopper';
+type Persona = 'risk-averse' | 'thrill-seeker' | 'price-sensitive' | 'status-driven' | 'logical' | 'emotional';
+type BookingReason = 'beginner-friendly' | 'kid-safety' | 'schedule-fit' | 'location-convenience' | 'injury-concern' | 'price-value' | 'exploratory' | 'social-energy';
+type ArbitrationMove = 'clarify' | 'answer' | 'preempt' | 'book' | 'parallel';
+type IdleStrike = 0 | 1 | 2 | 3;
 
 interface ScheduleSlot {
   id: string;
@@ -97,11 +139,19 @@ interface ChatMessage {
   quickReplies?: string[];
   scheduleSlots?: ScheduleSlot[];
   tldr?: string;
+  matTourScenes?: string[];
+  liveActivityKind?: 'booking' | 'viewing' | 'arriving';
+  neighborhoodOffer?: { dojo: SDNeighborhood; distanceMi: number; discount: number };
+  rebuttalVariantId?: string;
+  storyTag?: string;
+  nurtureTag?: 'day-minus-3' | 'day-minus-1' | 'day-zero-morning';
   meta?: {
     responseMs?: number;
     intent?: string;
     confidence?: number;
     sentiment?: 'neg' | 'neu' | 'pos';
+    archetype?: Archetype;
+    persona?: Persona;
   };
 }
 
@@ -123,9 +173,18 @@ interface Entities {
   travelMode?: TravelMode;
 }
 
+interface ObjectionDecayRecord {
+  firstSeenAt: number;
+  lastSeenAt: number;
+  intensity: number; // 0..1, decays over time
+  rebuttalVariantIds: string[]; // which variants were served
+}
+
 interface MemoryLayer {
   objections: ObjectionKey[];
   objectionCounts: Partial<Record<ObjectionKey, number>>;
+  objectionDecay: Partial<Record<ObjectionKey, ObjectionDecayRecord>>;
+  cycleCount: number;
   hesitations: number;
   engagementScore: number;
   messageCount: number;
@@ -133,6 +192,13 @@ interface MemoryLayer {
   lastUserMessage: string;
   confidenceScore: number; // 1.0 → 0
   unclearCount: number;
+  userResponseTimesMs: number[]; // pacing mirror (D1)
+  persona?: Persona;
+  dropOffRisk: number; // 0..1
+  conversionReadiness: number; // 0..1
+  churnRisk: number; // 0..1
+  storiesShown: string[];
+  narrativeBeatsSent: number;
 }
 
 interface ConversationState {
@@ -155,6 +221,18 @@ interface ConversationState {
   humanShadowActive: boolean;
   preemptedObjections: ObjectionKey[];
   messagesSent: number;
+  archetype?: Archetype;
+  bookingReason?: BookingReason;
+  idleStrikes: IdleStrike;
+  neighborhoodOfferShown: boolean;
+  matTourShown: boolean;
+  cycleBreakShown: boolean;
+  momentumLockActive: boolean;
+  dropOffSaveShown: boolean;
+  calendarShared: boolean;
+  liveActivityTicks: number;
+  lastNurtureTick?: number;
+  learnedIntentsAppliedAt?: number;
 }
 
 /* ─── SCHEDULE DATABASE (dynamic, capacity-aware) ─── */
@@ -171,6 +249,308 @@ const BASE_SLOTS: ScheduleSlot[] = [
 ];
 
 const SD_NEIGHBORHOODS: SDNeighborhood[] = ['North Park', 'Pacific Beach', 'La Jolla', 'Chula Vista', 'Hillcrest', 'Carlsbad'];
+
+/* ─── DOJO COORDS (for 1-mile hyper-local Neighborhood Special) ─── */
+const DOJO_COORDS: Record<SDNeighborhood, { lat: number; lng: number }> = {
+  'North Park': { lat: 32.7411, lng: -117.1297 },
+  'Pacific Beach': { lat: 32.7978, lng: -117.2405 },
+  'La Jolla': { lat: 32.8328, lng: -117.2713 },
+  'Chula Vista': { lat: 32.6401, lng: -117.0842 },
+  'Hillcrest': { lat: 32.7489, lng: -117.1647 },
+  'Carlsbad': { lat: 33.1581, lng: -117.3506 },
+};
+
+/* ─── OBJECTION GRAPH (cycle detection & related-follow-up prediction) ─── */
+const OBJECTION_GRAPH: Record<ObjectionKey, ObjectionKey[]> = {
+  'price':       ['safety', 'insurance', 'time'],
+  'safety':      ['price', 'kid-safety', 'insurance'],
+  'wear':        ['price', 'safety'],
+  'time':        ['price', 'safety'],
+  'insurance':   ['safety', 'price'],
+  'kid-safety':  ['safety', 'price', 'insurance'],
+};
+
+const OBJECTION_DECAY_HALF_LIFE_MS = 90_000; // intensity halves every 90s
+
+/* ─── ARCHETYPE PROFILES (4 Warrior Personas → tone/proof/emoji density) ─── */
+interface ArchetypeProfile {
+  label: string;
+  emoji: string;
+  emojiDensity: 'medium' | 'high' | 'very-high';
+  pacingMultiplier: number; // <1 = faster, >1 = slower
+  preferredProofStyle: 'empathy-first' | 'stats-first' | 'speed-first' | 'skeptic-data';
+  openingHook: string;
+  toneWord: string;
+}
+
+const ARCHETYPE_PROFILES: Record<Archetype, ArchetypeProfile> = {
+  NervousNewbie: {
+    label: '🌱 Nervous Newbie',
+    emoji: '🫂',
+    emojiDensity: 'medium',
+    pacingMultiplier: 1.35,
+    preferredProofStyle: 'empathy-first',
+    openingHook: '🫂💎 I see you, first-timer champion! Zero judgment, all the soft landings!',
+    toneWord: 'gentle',
+  },
+  BusyParent: {
+    label: '👨‍👩‍👧 Busy Parent',
+    emoji: '👶',
+    emojiDensity: 'high',
+    pacingMultiplier: 0.85,
+    preferredProofStyle: 'stats-first',
+    openingHook: "👶🛡️ Parent mode: FULLY understood! I'll keep this quick, clear, and receipts-first!",
+    toneWord: 'efficient',
+  },
+  EagerAthlete: {
+    label: '🥊 Eager Athlete',
+    emoji: '⚡',
+    emojiDensity: 'very-high',
+    pacingMultiplier: 0.7,
+    preferredProofStyle: 'speed-first',
+    openingHook: '⚡🔥 HUNGRY WARRIOR detected — I am locking in NOW, strap in!',
+    toneWord: 'explosive',
+  },
+  SkepticalShopper: {
+    label: '🧠 Skeptical Shopper',
+    emoji: '📊',
+    emojiDensity: 'medium',
+    pacingMultiplier: 1.15,
+    preferredProofStyle: 'skeptic-data',
+    openingHook: '📊💎 Smart shopper in the house — I got your receipts, citations, AND comparisons ready!',
+    toneWord: 'receipts',
+  },
+};
+
+/* ─── REBUTTAL BANK (A/B/C variants per objection → Darwinian conversion engine) ─── */
+interface RebuttalVariant {
+  id: string;
+  title: string;
+  body: string;
+  citation: string;
+  toneFit: ArchetypeProfile['preferredProofStyle'][];
+}
+
+const REBUTTAL_BANK: Record<ObjectionKey, RebuttalVariant[]> = {
+  'price': [
+    {
+      id: 'price_v1_stats',
+      title: '💸📊 Real-member RECEIPTS (numbers don\'t lie!)',
+      body: '73% of our members train 2×/week and their DAILY cost literally comes out to gym + one coffee — absolute STEAL! ☕🥋 Zero contract lock-in, 100% month-to-month freedom! 🆓✨',
+      citation: '📊 Internal 2025 member survey, n=412',
+      toneFit: ['stats-first', 'skeptic-data'],
+    },
+    {
+      id: 'price_v2_value',
+      title: '💎🔥 The VALUE comparison that ends the debate!',
+      body: 'One private BJJ lesson in San Diego = $120. 🤯 Our UNLIMITED monthly membership = less than FOUR of those! 💥 That\'s 16+ classes with elite coaching, community, AND a FREE trial to test-drive it ALL first! 🎁',
+      citation: '💰 SD martial arts market pricing 2025',
+      toneFit: ['empathy-first', 'speed-first'],
+    },
+    {
+      id: 'price_v3_testimonial',
+      title: '🗣️💎 What real members tell us (no scripts!)',
+      body: '"I was worried about the cost — then I realized I was spending more on DoorDash in a week." — Tanya M., Pacific Beach parent 👶✨ We hear this EXACT thing 3-4x a month! 🙌🔥',
+      citation: '💬 Member testimonials log 2024-2025',
+      toneFit: ['empathy-first'],
+    },
+  ],
+  'safety': [
+    {
+      id: 'safety_v1_stats',
+      title: '🛡️📊 The SAFETY RECEIPTS speak for themselves!',
+      body: '18 straight months: ZERO concussions. 🙌 Only 2 minor sprains across ~9,400 training sessions — that is STATISTICALLY safer than recreational basketball! 🏀📉 Let that SINK IN! 🔥',
+      citation: '📋 Pacific Coast Martial Arts incident log 2024–2025',
+      toneFit: ['stats-first', 'skeptic-data'],
+    },
+    {
+      id: 'safety_v2_process',
+      title: '🛡️🧠 Our SAFETY SYSTEM (how we engineered this!)',
+      body: '3 full weeks of pure TECHNIQUE drilling before ANY live sparring ✅ Tap-first culture (ego stays off the mats! 💯) ✅ Certified instructors with child-safety credentials ✅ Injury protocol reviewed QUARTERLY! 🛡️💎',
+      citation: '📝 PCMA safety handbook v2025',
+      toneFit: ['stats-first', 'skeptic-data'],
+    },
+    {
+      id: 'safety_v3_empathy',
+      title: '🫂💎 Real talk — I get the fear!',
+      body: 'Every single parent AND adult beginner has this exact worry on day one! 🙏 Our 3-week no-spar onboarding + tap-first culture means you leave feeling STRONGER, not broken. 💪✨ This is the softest landing in San Diego — promise! 🤝',
+      citation: '💬 First-class exit survey 2024',
+      toneFit: ['empathy-first'],
+    },
+  ],
+  'kid-safety': [
+    {
+      id: 'kid_v1_ratio',
+      title: '👶🛡️ Kid-safety MICROPROOF (parents read this TWICE!)',
+      body: 'Kids program = 6:1 coach ratio (basically elite private tutoring! 🎯), fully background-checked certified instructors 🧑‍🏫, trained 400+ San Diego kids over 3 years with ZERO serious injuries! 🙏✨ Parents watch EVERY class — full transparency always! 👀💯',
+      citation: '📊 California martial arts parent survey 2024',
+      toneFit: ['stats-first'],
+    },
+    {
+      id: 'kid_v2_stories',
+      title: '👶✨ The story parents tell us in month 2!',
+      body: '"My 7yo was hiding behind me on day 1 — three weeks later he WALKED IN first, shouted OSU at the coach, and started warming up on his own. You didn\'t just teach him BJJ, you gave him CONFIDENCE." 🥲💎 That\'s our every-week receipt! 🏆',
+      citation: '💬 Parent testimonials 2024-2025',
+      toneFit: ['empathy-first'],
+    },
+    {
+      id: 'kid_v3_structure',
+      title: '👶🧠 The KIDS STRUCTURE that makes it work!',
+      body: '✅ Max 6 kids per coach ✅ Class = 10min games + 20min technique + 10min cooldown ✅ Parents seated on transparent-glass benches (see EVERYTHING!) ✅ Monthly belt-stripe checkpoints keep motivation high! 🎯🏆',
+      citation: '📝 PCMA kids curriculum 2025',
+      toneFit: ['stats-first', 'skeptic-data'],
+    },
+  ],
+  'wear': [
+    {
+      id: 'wear_v1_simple',
+      title: '👕🙌 The first-class dress code (relax, you\'re fine!)',
+      body: '80% of first-timers roll up in regular GYM clothes — literally zero judgment! 💯 FREE loaner gis in every size at the front desk! 🎁 Just bring water + a towel + your warrior spirit! 💧🔥',
+      citation: '✅ First-class onboarding checklist',
+      toneFit: ['empathy-first', 'speed-first'],
+    },
+    {
+      id: 'wear_v2_detail',
+      title: '👕📋 Art-by-art outfit breakdown!',
+      body: '🥋 BJJ: Gi (FREE loaner) OR rashguard + grappling shorts\n🥊 Muay Thai: athletic shorts + tee\n🥋 Karate: loose comfortable clothes\nAlways: water bottle 💧 + small towel! That\'s literally it! 💎',
+      citation: '📝 Gear guide 2025',
+      toneFit: ['stats-first'],
+    },
+    {
+      id: 'wear_v3_testimonial',
+      title: '👕💬 What real first-timers say!',
+      body: '"I showed up in basketball shorts and a faded college tee. Nobody blinked. Coach tossed me a gi from the loaner rack and I was on the mat in 90 seconds." — Marcus T. 🏀➡️🥋 That\'s the VIBE! ✨',
+      citation: '💬 First-class testimonial 2024',
+      toneFit: ['empathy-first'],
+    },
+  ],
+  'time': [
+    {
+      id: 'time_v1_efficient',
+      title: '⏱️🏆 The typical champion schedule!',
+      body: 'MOST adult members train just 2×/week and feel HUGE improvements in 6–8 weeks flat! 📈💥 You do NOT need to live at the dojo to see life-changing results — efficiency is EVERYTHING! ⚡🎯',
+      citation: '📊 Member progression study 2024',
+      toneFit: ['stats-first', 'speed-first'],
+    },
+    {
+      id: 'time_v2_flexibility',
+      title: '📅✨ The SCHEDULE FLEXIBILITY that kills the "no time" excuse!',
+      body: 'Morning 6-8AM 🌅, Lunch 12PM 🌮, Evening 5-8PM 🌙, Saturdays 🏖️ — 47 class slots/week across locations! If you can\'t find 2 slots that fit your life, I\'ll eat my keyboard! ⌨️😤',
+      citation: '📅 PCMA weekly schedule',
+      toneFit: ['speed-first', 'skeptic-data'],
+    },
+    {
+      id: 'time_v3_busy',
+      title: '⏰💎 Built for BUSY humans (we see you!)',
+      body: 'Our members include ER nurses, startup founders, parents of 3, AND shift workers! 🏥💼👶 If they\'re finding 2hrs/week to train, so can you — we\'ll help you CUSTOM-CRAFT it! 🛠️🙌',
+      citation: '💬 Member occupation survey 2024',
+      toneFit: ['empathy-first'],
+    },
+  ],
+  'insurance': [
+    {
+      id: 'insurance_v1_basic',
+      title: '📋🛡️ Full legal coverage — zero vibe-killers!',
+      body: 'Every member signs a standard waiver. We carry COMMERCIAL liability insurance for every single mat session. 🏛️✨ Contracts are month-to-month, cancel ANYTIME — absolute freedom! 🆓💯',
+      citation: '📝 Standard enrollment agreement',
+      toneFit: ['stats-first', 'skeptic-data'],
+    },
+    {
+      id: 'insurance_v2_transparent',
+      title: '📋💎 Our full LEGAL stack (transparent AF!)',
+      body: '✅ Commercial general liability: $2M/$4M\n✅ Accident coverage for every drill\n✅ Month-to-month, cancel any day of the month\n✅ Full medical referral network if anything ever needs it! 🏥🤝',
+      citation: '📝 Business license + insurance cert 2025',
+      toneFit: ['skeptic-data'],
+    },
+    {
+      id: 'insurance_v3_human',
+      title: '🫂💎 The real-talk answer!',
+      body: 'We\'ve run this dojo 8 years, zero lawsuits, zero insurance claims that weren\'t minor. 🙏 Carlos will literally text you a photo of the full insurance cert if you want to verify! 📸✨ Trust is EARNED, not spoken! 🤝',
+      citation: '📋 Track record 2017-2025',
+      toneFit: ['empathy-first'],
+    },
+  ],
+};
+
+/* ─── NARRATIVE STORIES (micro-stories for identity alignment) ─── */
+interface NarrativeStory {
+  tag: string;
+  archetypeFit: Archetype[];
+  objectionFit: (ObjectionKey | 'general')[];
+  text: string;
+}
+
+const STORIES: NarrativeStory[] = [
+  {
+    tag: 'nervous-newbie-bjj',
+    archetypeFit: ['NervousNewbie'],
+    objectionFit: ['safety', 'general'],
+    text: '🥲💎 Last month, a guy named Derek walked in shaking — hadn\'t done anything physical in 5 years. Week 3, he tapped a blue belt in open mat. Walked out of here CRYING happy tears. 🙌✨ That\'s not a sales story, that\'s a Tuesday. 🔥',
+  },
+  {
+    tag: 'parent-transformation',
+    archetypeFit: ['BusyParent'],
+    objectionFit: ['kid-safety', 'general'],
+    text: '👶✨ "My 7yo Sophia was HIDING behind me on day 1. Four weeks later she walked in FIRST, shouted OSU, and helped teach a new kid the warmup. You didn\'t just teach her BJJ — you gave her an ENTIRE personality upgrade!" — Real text from Tanya last month. 💎🏆',
+  },
+  {
+    tag: 'busy-parent-schedule',
+    archetypeFit: ['BusyParent'],
+    objectionFit: ['time'],
+    text: '📅💎 Jenn — mom of 3, ER nurse, 50hr weeks — trains 2x/week on her off days, 6AM slot. "If I can do it, literally anyone can." Her words, not mine! 🙌🏥',
+  },
+  {
+    tag: 'eager-athlete-fire',
+    archetypeFit: ['EagerAthlete'],
+    objectionFit: ['general'],
+    text: '🔥⚡ Marco came in saying "I want to compete in 6 months." We laughed, gave him a plan. 8 months later he won his division at Pans Masters. 🏆💪 Point is: when you bring the HUNGER, we match the FIRE. 🥊',
+  },
+  {
+    tag: 'skeptic-conversion',
+    archetypeFit: ['SkepticalShopper'],
+    objectionFit: ['price', 'general'],
+    text: '📊💎 Brandon toured 4 gyms before us. Spreadsheet, literally. 😂 Compared curriculum, pricing, instructor lineage. Came back, signed up, wrote us a Google review titled "The math checks out." 📋🏆 That\'s our vibe — we RESPECT the diligence! 🫡',
+  },
+  {
+    tag: 'injury-comeback',
+    archetypeFit: ['NervousNewbie', 'SkepticalShopper'],
+    objectionFit: ['safety', 'general'],
+    text: '🛡️💎 Sarah came back after a 2-year knee rehab. Coach modified every drill, week-by-week. She\'s now in intermediate class — her orthopedist literally wrote a note saying "keep doing whatever you\'re doing." 📝🙌',
+  },
+  {
+    tag: 'price-transformation',
+    archetypeFit: ['SkepticalShopper', 'BusyParent'],
+    objectionFit: ['price'],
+    text: '💰✨ Mike did the math: "I was spending $200/mo on DoorDash. Switched to meal prep, signed up here instead. Same wallet, completely different life." 🍱🥋 We hear this one constantly. 💎',
+  },
+  {
+    tag: 'kid-shy-to-leader',
+    archetypeFit: ['BusyParent'],
+    objectionFit: ['kid-safety'],
+    text: '👶🌟 Jaden started as the shyest 6yo in the class. Month 4 he was LEADING the warmup line. Mom texted us: "I don\'t know what you did but he\'s a different kid." 🫶 That\'s the magic we\'re ALL about! 💎',
+  },
+];
+
+/* ─── LIVE ACTIVITY FEED (fake-but-believable injected "Just booked" events) ─── */
+const LIVE_ACTIVITY_TEMPLATES = {
+  booking: [
+    '⚡🔥 Someone from {nbhd} just booked the {day} {time} spot — this place is MOVING!',
+    '💥 Just in: a {adjective} beginner from {nbhd} locked in {day} {time}! Momentum is REAL!',
+    '🎯 Fresh booking alert — {nbhd} warrior claimed the {art} slot! The energy is ELECTRIC!',
+  ],
+  viewing: [
+    '👀 {count} people are eyeing this exact slot right now — it\'s moving FAST!',
+    '🔥 {count} warriors watching this schedule — decision-time vibes in the building!',
+    '⚡ Live count: {count} humans on this page actively considering — you\'re in good company!',
+  ],
+  arriving: [
+    '🥋 A {archetype} from {nbhd} just arrived at the dojo — energy is CRANKED!',
+    '💪 Fresh arrival: {nbhd} regular just walked in for the evening class!',
+    '🎯 {nbhd} warrior checking in at the front desk — these mats stay ALIVE!',
+  ],
+};
+
+const NBHD_ADJECTIVES = ['nervous', 'hyped', 'focused', 'determined', 'fired-up', 'curious'];
 
 /* ─── INTENT LABELS ─── */
 const INTENT_PATTERNS: Record<string, { keywords: RegExp[]; weight: number }> = {
@@ -353,8 +733,14 @@ function extractEntities(text: string, existing: Entities): Entities {
   return out;
 }
 
-/** Dynamic slot matcher — filters & ranks by relevance to current entities. */
-function matchSlots(entities: Entities, slots: ScheduleSlot[]): ScheduleSlot[] {
+/** Dynamic slot matcher — filters & ranks by relevance to current entities.
+ *  ENHANCED (A3): now blends traditional relevance score with predicted show-up fit. */
+function matchSlots(
+  entities: Entities,
+  slots: ScheduleSlot[],
+  memory?: MemoryLayer,
+  clock?: { weekdayIdx: number; hour24: number }
+): ScheduleSlot[] {
   let filtered = slots.slice();
 
   if (entities.audienceType === 'parent' || (entities.kidAge && entities.kidAge < 13)) {
@@ -387,6 +773,10 @@ function matchSlots(entities: Entities, slots: ScheduleSlot[]): ScheduleSlot[] {
     if (mr.length > 0) filtered = mr;
   }
 
+  const wi = clock?.weekdayIdx ?? 3;
+  const h24 = clock?.hour24 ?? 15;
+  const mem = memory ?? INITIAL_MEMORY;
+
   filtered = filtered
     .map(slot => {
       let score = 0;
@@ -399,6 +789,9 @@ function matchSlots(entities: Entities, slots: ScheduleSlot[]): ScheduleSlot[] {
       if (entities.travelMode === 'visitor' && slot.hour < 13) score += 2;
       score += Math.max(0, 4 - slot.spotsLeft);
       score += Math.min(slot.recentSignups, 12) * 0.15;
+      // A3: blend show-up fit (weighted 0.6 → impactful but doesn't override relevance)
+      const showUpFit = predictShowUpFit(slot, entities, mem, wi, h24);
+      score += (showUpFit - 50) * 0.1;
       return { slot, score };
     })
     .sort((a, b) => b.score - a.score)
@@ -407,19 +800,10 @@ function matchSlots(entities: Entities, slots: ScheduleSlot[]): ScheduleSlot[] {
   return filtered.slice(0, 4);
 }
 
-/** Context-aware typing delay (reading time + thinking time). */
+/** Context-aware typing delay (reading time + thinking time).
+ *  Kept for legacy call sites; main path uses computeAdaptiveDelay (B3 + D1). */
 function calculateTypingDelay(previousBotText: string, nextKind: MessageKind): number {
-  const readingTime = Math.min(3500, previousBotText.length * 22); // ~22ms/char, cap 3.5s
-  let thinking = 600;
-  switch (nextKind) {
-    case 'schedule':    thinking = 1100 + Math.random() * 400; break;
-    case 'microproof':  thinking = 900 + Math.random() * 300; break;
-    case 'empathy':     thinking = 500 + Math.random() * 200; break;
-    case 'clarify':     thinking = 700 + Math.random() * 300; break;
-    case 'human-shadow':thinking = 1400 + Math.random() * 500; break;
-    default:            thinking = 500 + Math.random() * 350;
-  }
-  return Math.max(400, readingTime * 0.3 + thinking);
+  return computeAdaptiveDelay(previousBotText, nextKind, 'neu', undefined, []);
 }
 
 function toObjectionKey(intent?: string): ObjectionKey | null {
@@ -431,20 +815,31 @@ function deriveNextMemory(
   current: MemoryLayer,
   text: string,
   topIntent: { intent: string; confidence: number } | undefined,
-  gainedEntity: boolean
+  gainedEntity: boolean,
+  responseTimesMs: number[],
+  userReplyMs?: number
 ): MemoryLayer {
+  const now = Date.now();
   const sameTwice = current.lastUserMessage.toLowerCase() === text.toLowerCase();
+  // A2: decay existing objections first
+  const decayed = decayObjections(current, now);
+
   const next: MemoryLayer = {
-    ...current,
-    objections: [...current.objections],
-    objectionCounts: { ...current.objectionCounts },
-    messageCount: current.messageCount + 1,
+    ...decayed,
+    objections: [...decayed.objections],
+    objectionCounts: { ...decayed.objectionCounts },
+    objectionDecay: { ...decayed.objectionDecay },
+    messageCount: decayed.messageCount + 1,
     lastUserMessage: text,
     sameMessageTwice: sameTwice,
-    engagementScore: current.engagementScore + (gainedEntity ? 12 : 5),
-    confidenceScore: current.confidenceScore,
-    unclearCount: current.unclearCount,
-    hesitations: current.hesitations,
+    engagementScore: decayed.engagementScore + (gainedEntity ? 12 : 5),
+    confidenceScore: decayed.confidenceScore,
+    unclearCount: decayed.unclearCount,
+    hesitations: decayed.hesitations,
+    cycleCount: decayed.cycleCount,
+    userResponseTimesMs: userReplyMs && userReplyMs > 0
+      ? [...decayed.userResponseTimesMs, userReplyMs].slice(-10)
+      : decayed.userResponseTimesMs,
   };
 
   if (sameTwice) {
@@ -462,10 +857,28 @@ function deriveNextMemory(
     const count = (next.objectionCounts[objection] ?? 0) + 1;
     next.objectionCounts[objection] = count;
     if (!next.objections.includes(objection)) next.objections.push(objection);
+    else next.objections = [...next.objections, objection]; // preserve history for cycle detection
+    // A2: stamp decay record
+    const stamped = stampObjection(next, objection);
+    next.objectionDecay = stamped.objectionDecay;
     if (count >= 2) {
       next.hesitations += 1;
       next.confidenceScore = Math.max(0, next.confidenceScore - 0.1);
     }
+    // D2: cycle detection
+    if (detectObjectionCycle(next.objections)) {
+      next.cycleCount += 1;
+    }
+  }
+
+  // A5: dual risk/readiness prediction (updated after every turn)
+  next.churnRisk = computeChurnRisk(next, responseTimesMs);
+  next.dropOffRisk = detectDropOffSignals(next, responseTimesMs) ? Math.max(next.dropOffRisk, 0.65) : Math.max(0, next.dropOffRisk - 0.08);
+
+  // C2: persona inference (locks in first detected persona, doesn't flip every turn)
+  if (!next.persona) {
+    const p = inferPersona(text, next, {});
+    if (p) next.persona = p;
   }
 
   return next;
@@ -599,21 +1012,694 @@ function predictNextObjection(ents: Entities, raised: ObjectionKey[]): Objection
   return candidates[0] ?? null;
 }
 
-/** Compute the next best move based on state, entities, memory, lead score. */
+/** Compute the next best move — now backed by the utility-score optimizer (A1). */
 function bestNextMove(
   state: ConversationState,
   entities: Entities,
   memory: MemoryLayer
-): 'greet' | 'clarify' | 'qualify' | 'preempt' | 'offer-slots' | 'close' | 'escalate' | 'microproof' {
-  if (memory.confidenceScore < 0.45 || memory.unclearCount >= 2) return 'escalate';
-  if (memory.objections.length >= 3 || Object.values(memory.objectionCounts).some(count => (count ?? 0) >= 2)) return 'escalate';
-  if (state.leadScore >= 80 && state.step !== 'done') return 'close';
-  if (state.step === 'greeting' && state.messagesSent === 0) return 'greet';
-  if (!entities.audienceType && !entities.art) return 'qualify';
-  if (entities.art && entities.experience && state.step !== 'schedule') return 'offer-slots';
-  if (entities.audienceType && !state.preemptedObjections.length && state.mode === 'explore') return 'preempt';
-  if (memory.objections.length > 0 && state.leadScore < 60) return 'microproof';
-  return 'qualify';
+): 'greet' | 'clarify' | 'qualify' | 'preempt' | 'offer-slots' | 'close' | 'escalate' | 'microproof' | 'story' | 'mat-tour' | 'momentum-lock' | 'drop-off-save' | 'cycle-break' | 'neighborhood-offer' {
+  // Hard-rail overrides (safety-critical transitions)
+  if (memory.cycleCount >= 2) return 'escalate';
+  if (memory.confidenceScore < 0.4 || memory.unclearCount >= 3) return 'escalate';
+  // Otherwise defer to the utility scorer
+  return pickTopMove(state, entities, memory).move;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ROCKET BOOSTER HELPERS (enhancements 26-49)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ─── A2: Objection decay + resurfacing (time-based intensity fade) ─── */
+function decayObjections(
+  memory: MemoryLayer,
+  nowMs: number
+): MemoryLayer {
+  const next = { ...memory, objectionDecay: { ...memory.objectionDecay } };
+  for (const k of Object.keys(next.objectionDecay) as ObjectionKey[]) {
+    const rec = next.objectionDecay[k];
+    if (!rec) continue;
+    const age = nowMs - rec.lastSeenAt;
+    const halfLives = age / OBJECTION_DECAY_HALF_LIFE_MS;
+    const decayed = rec.intensity * Math.pow(0.5, halfLives);
+    next.objectionDecay[k] = { ...rec, intensity: Math.max(0, decayed) };
+  }
+  return next;
+}
+
+function stampObjection(
+  memory: MemoryLayer,
+  key: ObjectionKey,
+  variantId?: string
+): MemoryLayer {
+  const now = Date.now();
+  const prev = memory.objectionDecay[key];
+  const intensity = Math.min(1, (prev?.intensity ?? 0) * 0.6 + 0.55);
+  return {
+    ...memory,
+    objectionDecay: {
+      ...memory.objectionDecay,
+      [key]: {
+        firstSeenAt: prev?.firstSeenAt ?? now,
+        lastSeenAt: now,
+        intensity,
+        rebuttalVariantIds: variantId
+          ? [...(prev?.rebuttalVariantIds ?? []), variantId]
+          : (prev?.rebuttalVariantIds ?? []),
+      },
+    },
+  };
+}
+
+function activeObjectionIntensity(memory: MemoryLayer, key: ObjectionKey): number {
+  return memory.objectionDecay[key]?.intensity ?? 0;
+}
+
+function pickStrongestActiveObjection(memory: MemoryLayer): ObjectionKey | null {
+  const ranked = (Object.keys(memory.objectionDecay) as ObjectionKey[])
+    .map(key => ({ key, intensity: activeObjectionIntensity(memory, key) }))
+    .filter(entry => entry.intensity >= 0.22)
+    .sort((a, b) => b.intensity - a.intensity);
+  return ranked[0]?.key ?? null;
+}
+
+function buildResurfacedObjectionLine(memory: MemoryLayer): string | null {
+  const strongest = pickStrongestActiveObjection(memory);
+  switch (strongest) {
+    case 'price':
+      return '💸🔥 Quick calm-the-brain note: your first class is STILL 100% FREE and everything after that stays month-to-month — ZERO trap doors, ZERO fine print, ZERO nonsense! 🆓💎✨ Just pure warrior value! 🏆';
+    case 'safety':
+      return '🛡️✨ Quick peace-of-mind note: the tap-first culture and 3-week drill-only onboarding are STILL protecting your first-step experience like a SHIELD of pure champion energy! 🤝💎🔥 You are SAFE here!';
+    case 'kid-safety':
+      return '👶🛡️ Parent peace-of-mind reminder: coaches stay CLOSE, parents can watch the ENTIRE class, and the whole kids format is built for calm confidence first — your little warrior is in LEGENDARY hands! 💎✨👑';
+    case 'time':
+      return '⏱️💎 Tiny reminder: I am STILL optimizing for the LOWEST-friction option, not the random one — these picks are ENGINEERED to fit your real, beautiful, chaotic life! 🎯✨🔥 Maximum convenience! ⚡';
+    case 'wear':
+      return '👕✨ ZERO wardrobe panic allowed: regular gym clothes + a FREE loaner gi still cover day one BEAUTIFULLY! 🙌🥋💎 Show up as you ARE, leave as a WARRIOR! 🔥';
+    case 'insurance':
+      return '📋💎 And YES — the grown-up admin stuff is FULLY buttoned up: waiver signed, coverage locked, clean front-desk process all handled like the PROFESSIONALS we are! ✅🏆✨ Zero stress!';
+    default:
+      return null;
+  }
+}
+
+function hashString(value: string): number {
+  let hash = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    hash = ((hash << 5) - hash) + value.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+}
+
+function getDemoCalendarBusySlotIds(
+  candidateSlots: ScheduleSlot[],
+  ents: Entities,
+  sessionSeed: string
+): Set<string> {
+  if (candidateSlots.length <= 1) return new Set();
+  const seed = hashString([
+    sessionSeed,
+    ents.name ?? '',
+    ents.location ?? '',
+    ents.art ?? '',
+    ents.preferredDay ?? '',
+    ents.preferredTime ?? '',
+    ents.audienceType ?? '',
+  ].join('|'));
+  const busyCount = Math.min(2, Math.max(1, Math.floor(candidateSlots.length / 2)));
+  const blocked = new Set<string>();
+
+  for (let i = 0; i < busyCount; i += 1) {
+    const idx = (seed + (i * 3)) % candidateSlots.length;
+    blocked.add(candidateSlots[idx].id);
+  }
+
+  return blocked;
+}
+
+function buildBookingReasonNudge(reason: BookingReason | undefined, slot: ScheduleSlot): string {
+  switch (reason) {
+    case 'beginner-friendly':
+      return `🌱 This exact ${slot.label} slot was chosen because it's the SOFTEST, friendliest on-ramp on the board — no chaos, no ego, just beautiful beginner momentum.`;
+    case 'kid-safety':
+      return `👶 You booked for peace of mind, and that's exactly why this class keeps structure high, coach attention tight, and first-day nerves LOW.`;
+    case 'schedule-fit':
+      return `📅 This slot won because it fits your week cleanly — the whole goal here is consistency without life-chaos.`;
+    case 'location-convenience':
+      return `📍 This class is pure convenience leverage — close to your world, easier to show up for, harder to skip.`;
+    case 'injury-concern':
+      return `🛡️ You said yes because you wanted the safe lane, and this session stays technique-first, controlled, and confidence-building from minute one.`;
+    case 'price-value':
+      return `💎 You picked the high-value move — all signal, no fluff, no wasted spend, just a clean first step with upside.`;
+    case 'social-energy':
+      return `🔥 You booked into this because the energy is REAL, and this crew absolutely brings that tribe vibe the second you walk in.`;
+    default:
+      return `✨ This booking was the right call for THIS version of your life — low friction, high upside, beautiful momentum.`;
+  }
+}
+
+function buildMatTourScenes(slot?: ScheduleSlot, ents?: Entities): string[] {
+  return [
+    `🚪✨ You walk into ${slot?.location ?? ents?.location ?? 'the dojo'} and the front desk LIGHTS UP — your name is ready, a cold water is in your hand, and there is ZERO awkwardness! 💎 Just instant "we've been WAITING for you" energy! 🔥`,
+    `🥋👑 Coach Carlos personally CLOCKS that you're ${ents?.experience === 'Beginner' ? 'brand-new and keeps it ULTRA-gentle — drill-only, no live rolls, pure technique in a safe bubble' : 'here to LEVEL UP and dials your lane in INSTANTLY — elite intensity, zero fluff'} — no ego theater, just LEGENDARY guidance! 💪⚡`,
+    `👀🏆 The room is full of focused, NORMAL humans — not cartoon tough guys! 😂 Lawyers, teachers, parents, students — all sweating together and the whole mat feels SURPRISINGLY welcoming and dialed-in like a well-oiled MACHINE! ✨🥋`,
+    `💪🔥 Forty-five minutes later you're DRENCHED in sweat, BEAMING with that champion glow, and thinking: "Wait... THAT was the scary thing?! I can ABSOLUTELY do this! When's the next class?!" 🏆💎⚡ THAT is the Pacific Coast experience! 🚀`,
+  ];
+}
+
+/* ─── D2: Objection graph + cycle breaker ─── */
+function detectObjectionCycle(objectionHistory: ObjectionKey[]): boolean {
+  if (objectionHistory.length < 3) return false;
+  const last3 = objectionHistory.slice(-3);
+  // Cycle = (A, B, A) pattern OR 3 different objections in rotation
+  if (last3[0] === last3[2] && last3[0] !== last3[1]) return true;
+  // Graph-based: last objection's successor appeared earlier → loop
+  const prev = last3[1];
+  const current = last3[2];
+  const related = OBJECTION_GRAPH[prev] || [];
+  return related.includes(current) && objectionHistory.slice(0, -1).includes(current);
+}
+
+/* ─── D3: Archetype clustering (4 Warrior Personas) ─── */
+function detectArchetype(ents: Entities, memory: MemoryLayer): Archetype | undefined {
+  const objs = memory.objections;
+  const hesitant = memory.hesitations >= 2 || memory.confidenceScore < 0.6;
+  const skeptical = objs.filter(o => o === 'price' || o === 'insurance').length >= 1 && memory.messageCount >= 3;
+  const kidFocused = ents.audienceType === 'parent' || Boolean(ents.kidAge);
+  const fastMover = memory.engagementScore > 30 && memory.hesitations === 0;
+
+  if (kidFocused) return 'BusyParent';
+  if (skeptical) return 'SkepticalShopper';
+  if (fastMover) return 'EagerAthlete';
+  if (hesitant || ents.experience === 'Beginner') return 'NervousNewbie';
+  return undefined;
+}
+
+/* ─── C2: Psychological persona inference ─── */
+function inferPersona(text: string, memory: MemoryLayer, ents: Entities): Persona | undefined {
+  const t = text.toLowerCase();
+  if (/safe|worried|scared|risk|hurt|injury/.test(t)) return 'risk-averse';
+  if (/best|top|elite|premium|prestige|only the/.test(t)) return 'status-driven';
+  if (/cost|price|afford|cheap|budget|worth it/.test(t)) return 'price-sensitive';
+  if (/excited|love|let'?s go|pumped|hyped|ready/.test(t)) return 'thrill-seeker';
+  if (/stats|data|proof|numbers|receipts|compare/.test(t)) return 'logical';
+  if (/feel|story|experience|journey|vibe/.test(t)) return 'emotional';
+  // Fallback inference from memory
+  if (memory.objections.includes('safety') || memory.objections.includes('kid-safety')) return 'risk-averse';
+  if (memory.objections.includes('price')) return 'price-sensitive';
+  if (ents.experience === 'Experienced') return 'status-driven';
+  return undefined;
+}
+
+/* ─── A3: Slot show-up fit predictor ─── */
+function predictShowUpFit(
+  slot: ScheduleSlot,
+  ents: Entities,
+  memory: MemoryLayer,
+  weekdayIdx: number,
+  hour24: number
+): number {
+  let fit = 50;
+
+  // Commute friction: same-neighborhood bonus, cross-town penalty
+  if (ents.location && slot.location === ents.location) fit += 20;
+  else if (ents.location) {
+    const userCoord = SD_LOCATION_COORDS[ents.location];
+    const slotCoord = DOJO_COORDS[slot.location];
+    if (userCoord && slotCoord) {
+      const dist = distanceMiles(userCoord.lat, userCoord.lng, slotCoord.lat, slotCoord.lng);
+      if (dist < 2) fit += 15;
+      else if (dist < 5) fit += 7;
+      else if (dist > 10) fit -= 12;
+    }
+  }
+
+  // Commitment-by-hour bias: evenings 5-8 = highest commit, 6AM = needs dedication
+  if (slot.hour >= 17 && slot.hour <= 20) fit += 10;
+  else if (slot.hour < 8) {
+    if (memory.engagementScore > 40) fit += 6; // highly engaged users keep early slots
+    else fit -= 8;
+  }
+
+  // Beginner dropout-risk: first slot of the week is harder to commit to
+  if (ents.experience === 'Beginner' && slot.beginnerFriendly) fit += 12;
+  if (ents.experience === 'Beginner' && !slot.beginnerFriendly) fit -= 25;
+
+  // Confidence matching: low confidence → prefer weekend or later evening
+  if (memory.confidenceScore < 0.6) {
+    if (slot.isoDay === 6 || slot.isoDay === 0) fit += 8;
+    if (slot.hour >= 18) fit += 4;
+  }
+
+  // Sameday-soon-enough bonus
+  const daysAway = ((slot.isoDay - weekdayIdx + 7) % 7) || 7;
+  if (daysAway <= 2) fit += 8;
+  if (daysAway === 0 && slot.hour > hour24 + 2) fit += 10;
+
+  // Scarcity: slight bonus but not overwhelming
+  fit += Math.max(0, 4 - slot.spotsLeft) * 2;
+
+  return fit;
+}
+
+/* ─── A1: Utility-score conversation state optimizer ─── */
+interface UtilityScore {
+  move: 'greet' | 'clarify' | 'qualify' | 'preempt' | 'offer-slots' | 'close' | 'escalate' | 'microproof' | 'story' | 'mat-tour' | 'momentum-lock' | 'drop-off-save' | 'cycle-break' | 'neighborhood-offer';
+  utility: number;
+  rationale: string;
+}
+
+function computeUtilityScores(
+  state: ConversationState,
+  entities: Entities,
+  memory: MemoryLayer
+): UtilityScore[] {
+  const scores: UtilityScore[] = [];
+  const bookingLikelihood = Math.min(1, state.leadScore / 100);
+  const uncertainty = 1 - memory.confidenceScore;
+  const objectionRisk = Math.min(1, memory.objections.length / 3);
+  const questionBurden = Math.max(0, state.messagesSent - 4) / 10;
+
+  const infoComplete = Boolean(entities.art && entities.experience && entities.location);
+
+  // Close move
+  if (state.leadScore >= 75 && infoComplete) {
+    scores.push({ move: 'close', utility: 0.85 + bookingLikelihood * 0.15, rationale: 'Hot lead + profile complete' });
+  }
+  // Momentum lock
+  if (state.leadScore >= 60 && state.step !== 'schedule' && state.step !== 'post-booking' && !state.momentumLockActive) {
+    scores.push({ move: 'momentum-lock', utility: 0.7 + bookingLikelihood * 0.2, rationale: 'Warm lead needs micro-yes ladder' });
+  }
+  // Cycle break
+  if (memory.cycleCount >= 1 && !state.cycleBreakShown) {
+    scores.push({ move: 'cycle-break', utility: 0.95, rationale: 'Objection cycle detected' });
+  }
+  // Drop-off save
+  if (memory.dropOffRisk > 0.55 && !state.dropOffSaveShown) {
+    scores.push({ move: 'drop-off-save', utility: 0.8 + memory.dropOffRisk * 0.15, rationale: 'High drop-off risk detected' });
+  }
+  // Mat tour
+  if ((memory.hesitations >= 2 || entities.experience === 'Beginner') && !state.matTourShown && state.step === 'schedule') {
+    scores.push({ move: 'mat-tour', utility: 0.65, rationale: 'Nervous beginner at schedule step' });
+  }
+  // Escalate
+  if (uncertainty > 0.55 || memory.cycleCount >= 2 || memory.unclearCount >= 2) {
+    scores.push({ move: 'escalate', utility: 0.75 + uncertainty * 0.2, rationale: 'Uncertainty + cycle risk' });
+  }
+  // Offer slots
+  if (infoComplete || (entities.art && entities.experience)) {
+    scores.push({ move: 'offer-slots', utility: 0.6 + bookingLikelihood * 0.25, rationale: 'Profile sufficient for slot offer' });
+  }
+  // Preempt objections
+  if (state.preemptedObjections.length < 2 && state.mode === 'explore' && !objectionRisk) {
+    scores.push({ move: 'preempt', utility: 0.5, rationale: 'Fresh lead, preempt next likely objection' });
+  }
+  // Story
+  if (memory.narrativeBeatsSent < 2 && state.mode !== 'explore') {
+    scores.push({ move: 'story', utility: 0.45 + (1 - questionBurden) * 0.1, rationale: 'Narrative reinforcement opportunity' });
+  }
+  // Microproof
+  if (memory.objections.length > 0 && state.leadScore < 65) {
+    scores.push({ move: 'microproof', utility: 0.55 + objectionRisk * 0.2, rationale: 'Active objection to rebut' });
+  }
+  // Qualify
+  if (!entities.art || !entities.audienceType) {
+    scores.push({ move: 'qualify', utility: 0.4 - questionBurden * 0.2, rationale: 'Missing core profile data' });
+  }
+  // Greet
+  if (state.messagesSent === 0) {
+    scores.push({ move: 'greet', utility: 0.9, rationale: 'Cold start' });
+  }
+  // Clarify
+  if (uncertainty > 0.3 && memory.unclearCount >= 1) {
+    scores.push({ move: 'clarify', utility: 0.5 + uncertainty * 0.3, rationale: 'Ambiguous intent' });
+  }
+
+  return scores.sort((a, b) => b.utility - a.utility);
+}
+
+function pickTopMove(
+  state: ConversationState,
+  entities: Entities,
+  memory: MemoryLayer
+): UtilityScore {
+  const scores = computeUtilityScores(state, entities, memory);
+  return scores[0] ?? { move: 'qualify', utility: 0, rationale: 'default fallback' };
+}
+
+/* ─── A4: Multi-turn intent arbitration ─── */
+function arbitrateIntent(
+  intents: { intent: string; confidence: number }[],
+  memory: MemoryLayer,
+  state: ConversationState,
+  entities: Entities
+): ArbitrationMove {
+  if (intents.length === 0) return 'clarify';
+  const top = intents[0];
+  const second = intents[1];
+  const gap = second ? top.confidence - second.confidence : top.confidence;
+
+  // Parallel: 2+ high-confidence intents with small gap
+  if (second && top.confidence >= 0.45 && second.confidence >= 0.4 && gap < 0.2) {
+    return 'parallel';
+  }
+  // Low confidence → clarify
+  if (top.confidence < 0.4 || memory.unclearCount >= 2) return 'clarify';
+  // High booking momentum + info complete → book
+  if (state.leadScore >= 70 && entities.art && entities.experience && top.intent !== 'escalate:human') {
+    return 'book';
+  }
+  if (top.intent === 'action:book') return 'book';
+  // Fresh objection coming → preempt before answering
+  if (state.mode === 'explore' && state.preemptedObjections.length === 0 && !top.intent.startsWith('objection:')) {
+    return 'preempt';
+  }
+  return 'answer';
+}
+
+/* ─── A5: Churn-risk + conversion-readiness dual prediction ─── */
+function computeChurnRisk(memory: MemoryLayer, responseTimes: number[]): number {
+  let risk = 0;
+  if (memory.hesitations >= 3) risk += 0.25;
+  if (memory.cycleCount >= 1) risk += 0.2;
+  if (memory.unclearCount >= 2) risk += 0.15;
+  if (memory.confidenceScore < 0.5) risk += 0.2;
+  if (memory.sameMessageTwice) risk += 0.15;
+  // Slow response trend (avg of last 3 vs last 6 — slowing down = disengaging)
+  if (responseTimes.length >= 6) {
+    const recent = responseTimes.slice(-3).reduce((a, b) => a + b, 0) / 3;
+    const earlier = responseTimes.slice(-6, -3).reduce((a, b) => a + b, 0) / 3;
+    if (recent > earlier * 1.5) risk += 0.1;
+  }
+  return Math.min(1, risk);
+}
+
+function computeConversionReadiness(
+  state: ConversationState,
+  memory: MemoryLayer,
+  ents: Entities
+): number {
+  let r = 0;
+  r += Math.min(0.35, state.leadScore / 100 * 0.5);
+  if (ents.art) r += 0.1;
+  if (ents.experience) r += 0.1;
+  if (ents.location) r += 0.08;
+  if (ents.audienceType) r += 0.05;
+  if (memory.engagementScore > 30) r += 0.1;
+  if (state.mode === 'close') r += 0.15;
+  if (state.preemptedObjections.length > 0) r += 0.05;
+  r -= Math.min(0.2, memory.objections.length * 0.05);
+  r -= Math.min(0.15, memory.hesitations * 0.05);
+  return Math.max(0, Math.min(1, r));
+}
+
+/* ─── C4: Drop-off prediction ─── */
+function detectDropOffSignals(memory: MemoryLayer, responseTimes: number[]): boolean {
+  if (memory.hesitations >= 3 && memory.confidenceScore < 0.55) return true;
+  if (memory.sameMessageTwice && memory.unclearCount >= 1) return true;
+  if (responseTimes.length >= 4) {
+    const last = responseTimes[responseTimes.length - 1];
+    const avg = responseTimes.slice(0, -1).reduce((a, b) => a + b, 0) / (responseTimes.length - 1);
+    if (last > avg * 2.2 && avg > 2000) return true;
+  }
+  return false;
+}
+
+/* ─── A6: Booking-reason determination (for personalized nurture) ─── */
+function determineBookingReason(
+  memory: MemoryLayer,
+  ents: Entities,
+  slot: ScheduleSlot
+): BookingReason {
+  if (ents.audienceType === 'parent' || ents.kidAge) {
+    if (memory.objections.includes('kid-safety') || memory.objections.includes('safety')) return 'kid-safety';
+  }
+  if (memory.objections.includes('safety')) return 'injury-concern';
+  if (memory.objections.includes('price') && memory.objectionCounts.price! >= 2) return 'price-value';
+  if (memory.objections.includes('time') || ents.preferredTime) return 'schedule-fit';
+  if (ents.experience === 'Beginner') return 'beginner-friendly';
+  if (ents.location && slot.location === ents.location) return 'location-convenience';
+  if (memory.engagementScore > 40) return 'social-energy';
+  return 'exploratory';
+}
+
+/* ─── B4 / C1: A/B/C rebuttal variant picker + outcome tracking ─── */
+interface RebuttalStat {
+  variantId: string;
+  shown: number;
+  nextAction: number; // clicks toward slots or booking
+  bookings: number;
+}
+
+const REBUTTAL_STATS_KEY = 'matboss_rebuttal_stats_v1';
+
+function loadRebuttalStats(): Record<string, RebuttalStat> {
+  try {
+    if (typeof window === 'undefined') return {};
+    const raw = window.localStorage.getItem(REBUTTAL_STATS_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveRebuttalStats(stats: Record<string, RebuttalStat>) {
+  try {
+    if (typeof window !== 'undefined') window.localStorage.setItem(REBUTTAL_STATS_KEY, JSON.stringify(stats));
+  } catch { /* ignore */ }
+}
+
+function logRebuttalShown(variantId: string) {
+  const stats = loadRebuttalStats();
+  if (!stats[variantId]) stats[variantId] = { variantId, shown: 0, nextAction: 0, bookings: 0 };
+  stats[variantId].shown += 1;
+  saveRebuttalStats(stats);
+}
+
+function logRebuttalOutcome(variantId: string, outcome: 'nextAction' | 'booking') {
+  const stats = loadRebuttalStats();
+  if (!stats[variantId]) stats[variantId] = { variantId, shown: 0, nextAction: 0, bookings: 0 };
+  if (outcome === 'nextAction') stats[variantId].nextAction += 1;
+  if (outcome === 'booking') stats[variantId].bookings += 1;
+  saveRebuttalStats(stats);
+}
+
+function pickRebuttalVariant(
+  objection: ObjectionKey,
+  archetype: Archetype | undefined,
+  persona: Persona | undefined,
+  alreadyShown: string[]
+): RebuttalVariant {
+  const bank = REBUTTAL_BANK[objection];
+  const stats = loadRebuttalStats();
+  const style = archetype ? ARCHETYPE_PROFILES[archetype].preferredProofStyle : undefined;
+
+  // Filter out already-shown variants if alternates exist
+  const available = bank.filter(v => !alreadyShown.includes(v.id));
+  const pool = available.length > 0 ? available : bank;
+
+  // Score each variant: tone fit + historical performance (epsilon-greedy exploration)
+  const scored = pool.map(v => {
+    let score = 0;
+    if (style && v.toneFit.includes(style)) score += 1.2;
+    if (persona === 'logical' && v.toneFit.includes('stats-first')) score += 0.5;
+    if (persona === 'emotional' && v.toneFit.includes('empathy-first')) score += 0.6;
+    if (persona === 'risk-averse' && v.toneFit.includes('empathy-first')) score += 0.4;
+    if (persona === 'price-sensitive' && v.toneFit.includes('skeptic-data')) score += 0.4;
+    const s = stats[v.id];
+    if (s && s.shown > 0) {
+      const ctr = (s.nextAction + s.bookings * 3) / s.shown;
+      score += ctr;
+    }
+    // Epsilon-greedy: 15% random exploration
+    if (Math.random() < 0.15) score += Math.random() * 0.8;
+    return { v, score };
+  });
+  scored.sort((a, b) => b.score - a.score);
+  return scored[0].v;
+}
+
+/* ─── C3: Story picker for narrative engine ─── */
+function pickStoryForMoment(
+  archetype: Archetype | undefined,
+  lastObjection: ObjectionKey | undefined,
+  alreadyShown: string[]
+): NarrativeStory | null {
+  const pool = STORIES.filter(s => !alreadyShown.includes(s.tag));
+  if (pool.length === 0) return null;
+  const scored = pool.map(s => {
+    let score = 0;
+    if (archetype && s.archetypeFit.includes(archetype)) score += 1.5;
+    if (lastObjection && s.objectionFit.includes(lastObjection)) score += 1.2;
+    if (s.objectionFit.includes('general')) score += 0.3;
+    score += Math.random() * 0.3;
+    return { s, score };
+  });
+  scored.sort((a, b) => b.score - a.score);
+  return scored[0].s;
+}
+
+/* ─── B5: 1-mile geo-fence offer ─── */
+function computeNeighborhoodOffer(userLat: number, userLng: number): { dojo: SDNeighborhood; distanceMi: number; discount: number } | null {
+  let closest: { dojo: SDNeighborhood; distanceMi: number } | null = null;
+  for (const [name, coords] of Object.entries(DOJO_COORDS)) {
+    const d = distanceMiles(userLat, userLng, coords.lat, coords.lng);
+    if (!closest || d < closest.distanceMi) {
+      closest = { dojo: name as SDNeighborhood, distanceMi: d };
+    }
+  }
+  if (!closest) return null;
+  if (closest.distanceMi <= 1.0) return { ...closest, discount: 20 };
+  if (closest.distanceMi <= 2.0) return { ...closest, discount: 10 };
+  return null;
+}
+
+/* ─── B3 + D1: Sentiment-adaptive + user-pace mirror typing delay ─── */
+function computeAdaptiveDelay(
+  previousBotText: string,
+  nextKind: MessageKind,
+  sentiment: 'neg' | 'neu' | 'pos',
+  archetype: Archetype | undefined,
+  userResponseTimesMs: number[]
+): number {
+  const readingTime = Math.min(3500, previousBotText.length * 22);
+  let thinking = 600;
+  switch (nextKind) {
+    case 'schedule':           thinking = 1100 + Math.random() * 400; break;
+    case 'microproof':         thinking = 900 + Math.random() * 300; break;
+    case 'empathy':            thinking = 500 + Math.random() * 200; break;
+    case 'clarify':            thinking = 700 + Math.random() * 300; break;
+    case 'human-shadow':       thinking = 1400 + Math.random() * 500; break;
+    case 'mat-tour':           thinking = 1200 + Math.random() * 400; break;
+    case 'story':              thinking = 950 + Math.random() * 350; break;
+    case 'cycle-breaker':      thinking = 1300 + Math.random() * 400; break;
+    case 'drop-off-save':      thinking = 600 + Math.random() * 250; break;
+    case 'momentum-lock':      thinking = 450 + Math.random() * 200; break;
+    case 'parallel-answer':    thinking = 1000 + Math.random() * 350; break;
+    case 'neighborhood-offer': thinking = 1100 + Math.random() * 350; break;
+    default:                   thinking = 500 + Math.random() * 350;
+  }
+
+  // B3: sentiment pacing
+  let sentimentMult = 1;
+  if (sentiment === 'pos') sentimentMult = 0.6; // 40% faster for excited
+  else if (sentiment === 'neg') sentimentMult = 1.5; // 50% slower for nervous
+
+  // D3: archetype pacing
+  const archMult = archetype ? ARCHETYPE_PROFILES[archetype].pacingMultiplier : 1;
+
+  // D1: user-pace mirror
+  let mirrorFactor = 1;
+  if (userResponseTimesMs.length >= 2) {
+    const recent = userResponseTimesMs.slice(-4);
+    const avgUserPace = recent.reduce((a, b) => a + b, 0) / recent.length;
+    mirrorFactor = Math.max(0.7, Math.min(1.3, avgUserPace / 1800));
+  }
+
+  return Math.max(400, readingTime * 0.3 + thinking * sentimentMult * archMult * mirrorFactor);
+}
+
+/* ─── D5: Session replay learning — extract high-signal phrases ─── */
+const LEARNED_INTENTS_KEY = 'matboss_learned_intents_v1';
+interface LearnedIntent { phrase: string; intent: string; weight: number }
+
+function loadLearnedIntents(): LearnedIntent[] {
+  try {
+    if (typeof window === 'undefined') return [];
+    const raw = window.localStorage.getItem(LEARNED_INTENTS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveLearnedIntents(intents: LearnedIntent[]) {
+  try {
+    if (typeof window !== 'undefined') window.localStorage.setItem(LEARNED_INTENTS_KEY, JSON.stringify(intents.slice(0, 200)));
+  } catch { /* ignore */ }
+}
+
+function replayAndLearn(messages: ChatMessage[], outcomeWeight: number) {
+  const learned = loadLearnedIntents();
+  for (let i = 0; i < messages.length; i++) {
+    const m = messages[i];
+    if (m.sender !== 'user') continue;
+    const conf = m.meta?.confidence ?? 0;
+    const intent = m.meta?.intent;
+    if (intent && conf < 0.45 && conf > 0 && m.text.length < 90) {
+      // Low-confidence intent that led to eventual success → capture phrase
+      const phrase = m.text.toLowerCase().trim();
+      const existing = learned.find(l => l.phrase === phrase);
+      if (existing) existing.weight = Math.min(2, existing.weight + outcomeWeight * 0.5);
+      else learned.push({ phrase, intent, weight: outcomeWeight });
+    }
+  }
+  saveLearnedIntents(learned);
+}
+
+function applyLearnedIntents(text: string, baseScores: { intent: string; confidence: number }[]): { intent: string; confidence: number }[] {
+  const learned = loadLearnedIntents();
+  if (learned.length === 0) return baseScores;
+  const tokensInText = tokenize(text);
+  const boosts: Record<string, number> = {};
+  for (const l of learned) {
+    const phraseTokens = tokenize(l.phrase);
+    if (phraseTokens.length === 0) continue;
+    const overlap = phraseTokens.filter(t => tokensInText.includes(t)).length / phraseTokens.length;
+    if (overlap >= 0.6) {
+      boosts[l.intent] = (boosts[l.intent] ?? 0) + l.weight * overlap * 0.3;
+    }
+  }
+  const adjusted = [...baseScores];
+  for (const [intent, boost] of Object.entries(boosts)) {
+    const existing = adjusted.find(s => s.intent === intent);
+    if (existing) existing.confidence = Math.min(1, existing.confidence + boost);
+    else adjusted.push({ intent, confidence: Math.min(1, boost) });
+  }
+  adjusted.sort((a, b) => b.confidence - a.confidence);
+  return adjusted;
+}
+
+/* ─── D6: Nurture checkpoints scheduler ─── */
+interface NurtureCheckpoint {
+  tag: 'day-minus-3' | 'day-minus-1' | 'day-zero-morning';
+  fireAtMs: number;
+  message: string;
+}
+
+function scheduleNurtureCheckpoints(
+  slot: ScheduleSlot,
+  weekdayIdx: number,
+  nowMs: number,
+  bookingReason?: BookingReason
+): NurtureCheckpoint[] {
+  const daysAway = ((slot.isoDay - weekdayIdx + 7) % 7) || 7;
+  const dayMs = 24 * 60 * 60 * 1000;
+  const classMs = nowMs + daysAway * dayMs;
+  const reasonNudge = buildBookingReasonNudge(bookingReason, slot);
+  // For demo purposes, compress the real day-timers into ~seconds of live preview
+  // (production would use actual cron/SMS; here we just preview them soon so you can see the flow)
+  const out: NurtureCheckpoint[] = [];
+  if (daysAway >= 3) {
+    out.push({
+      tag: 'day-minus-3',
+      fireAtMs: nowMs + 8000,
+      message: `📹💎 T-minus 3 days to your ${slot.art} class at ${slot.location}! 🔥 ${reasonNudge} Here's your 60-sec warm-up drill + mindset video: pcmadojo.com/warmup/${slot.art.toLowerCase().replace(/\s+/g, '-')} ✨ Watch it once and you'll walk in feeling LEGENDARY! 🏆`,
+    });
+  }
+  if (daysAway >= 1) {
+    out.push({
+      tag: 'day-minus-1',
+      fireAtMs: nowMs + 16000,
+      message: `🅿️🗺️ TOMORROW IS THE DAY, champion!! 🔥 ${reasonNudge} Parking guide for ${slot.location}: pcmadojo.com/parking/${slot.location.toLowerCase().replace(/\s+/g, '-')} ✨ Lot A first, side-street backup included. Arrive 15 min early, hydrate, sleep well! 💤💧 This is YOUR moment! 💎🥋`,
+    });
+  }
+  out.push({
+    tag: 'day-zero-morning',
+    fireAtMs: Math.max(nowMs + 24000, classMs - 4 * 60 * 60 * 1000),
+    message: `🔥🌅 TODAY'S THE DAY, WARRIOR!! 💎 ${reasonNudge} Your ${slot.day} ${slot.time} class at ${slot.location} is LOCKED AND LOADED! ✨ Remember: ego off, curiosity on, tap-first culture rules! You're gonna CRUSH this! 💪🥋🏆 Sensei Carlos will greet you personally! 👑`,
+  });
+  return out;
 }
 
 /* ─── PERSISTENCE ─── */
@@ -665,11 +1751,21 @@ const INITIAL_STATE: ConversationState = {
   humanShadowActive: false,
   preemptedObjections: [],
   messagesSent: 0,
+  idleStrikes: 0,
+  neighborhoodOfferShown: false,
+  matTourShown: false,
+  cycleBreakShown: false,
+  momentumLockActive: false,
+  dropOffSaveShown: false,
+  calendarShared: false,
+  liveActivityTicks: 0,
 };
 
 const INITIAL_MEMORY: MemoryLayer = {
   objections: [],
   objectionCounts: {},
+  objectionDecay: {},
+  cycleCount: 0,
   hesitations: 0,
   engagementScore: 0,
   messageCount: 0,
@@ -677,6 +1773,12 @@ const INITIAL_MEMORY: MemoryLayer = {
   lastUserMessage: '',
   confidenceScore: 1.0,
   unclearCount: 0,
+  userResponseTimesMs: [],
+  dropOffRisk: 0,
+  conversionReadiness: 0,
+  churnRisk: 0,
+  storiesShown: [],
+  narrativeBeatsSent: 0,
 };
 
 export default function LiveBookingBot() {
@@ -697,12 +1799,19 @@ export default function LiveBookingBot() {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const nextId = useRef(1);
   const idleTimerRef = useRef<number | null>(null);
+  const strike2TimerRef = useRef<number | null>(null);
+  const strike3TimerRef = useRef<number | null>(null);
+  const liveActivityTimerRef = useRef<number | null>(null);
+  const nurtureTimerRefs = useRef<number[]>([]);
   const hiddenAtRef = useRef<number | null>(null);
   const bootedRef = useRef(false);
   const sessionIdRef = useRef(`local-${Math.random().toString(36).slice(2, 8)}`);
   const hasEscalatedRef = useRef(false);
   const hasShownIdleNudgeRef = useRef(false);
   const postEscalationTurnRef = useRef(0);
+  const lastBotSentAtRef = useRef<number>(Date.now()); // D1: for user-pace mirror
+  const rebuttalsShownRef = useRef<string[]>([]); // track variants shown this session
+  const activeVariantIdRef = useRef<string | null>(null); // variant awaiting outcome
 
   /* ─── Persist on every change ─── */
   useEffect(() => {
@@ -777,28 +1886,87 @@ export default function LiveBookingBot() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [messages, thinking]);
 
-  /* ─── Sunk cost re-engagement (45s idle at schedule step) ─── */
+  /* ─── B6: Three-Strike Idle Re-Engagement Sequence (45s / 3m / 5m escalation) ─── */
   useEffect(() => {
-    if (state.step !== 'schedule' || state.step === undefined) return;
-    if (hasShownIdleNudgeRef.current || hasEscalatedRef.current) return;
+    if (state.step !== 'schedule') return;
+    if (hasEscalatedRef.current) return;
     if (idleTimerRef.current) window.clearTimeout(idleTimerRef.current);
+    if (strike2TimerRef.current) window.clearTimeout(strike2TimerRef.current);
+    if (strike3TimerRef.current) window.clearTimeout(strike3TimerRef.current);
+
+    const clearAll = () => {
+      if (idleTimerRef.current) window.clearTimeout(idleTimerRef.current);
+      if (strike2TimerRef.current) window.clearTimeout(strike2TimerRef.current);
+      if (strike3TimerRef.current) window.clearTimeout(strike3TimerRef.current);
+    };
+
+    // STRIKE 1: 45s light nudge
     idleTimerRef.current = window.setTimeout(() => {
-      if (hasShownIdleNudgeRef.current || hasEscalatedRef.current) return;
-      if (Date.now() - lastActivityAt >= 44000) {
-        const featuredSlot = lastOfferedSlots[0] || slots[0];
+      if (hasEscalatedRef.current) return;
+      if (Date.now() - lastActivityAt < 44000) return;
+      const featuredSlot = lastOfferedSlots[0] || slots[0];
+      if (!hasShownIdleNudgeRef.current) {
+        const shouldMatTour =
+          !state.matTourShown
+          && (memory.hesitations >= 2 || /nervous|scared|not sure what to expect|what happens/i.test(memory.lastUserMessage));
+
+        if (shouldMatTour) {
+          pushBot({
+            kind: 'mat-tour',
+            text: `🎥✨💎 Before you bounce, let me run the 20-second MENTAL MAT TOUR so your brain stops inventing monsters that aren't there. 🫂🥋 Here's what this experience ACTUALLY feels like:`,
+            matTourScenes: buildMatTourScenes(featuredSlot, entities),
+            quickReplies: ['Show me that slot', 'I want the beginner-friendly one', 'Talk to Carlos'],
+          });
+          setMemory(m => ({ ...m, hesitations: m.hesitations + 1 }));
+          hasShownIdleNudgeRef.current = true;
+          setState(prev => ({ ...prev, idleStrikes: 1, matTourShown: true }));
+          return;
+        }
+
         pushBot({
           kind: 'text',
-          text: `👋🔥 Hey — still with me, legend?! 💎 I see you vibing with the slots and I RESPECT that energy! ✨ Want me to HOLD one for 10 whole minutes while you lock it in mentally?! 🔒⏰ The ${featuredSlot?.day} ${featuredSlot?.time} slot at ${featuredSlot?.location} only has ${featuredSlot?.spotsLeft} spots left and it's moving FAST — just say the word! 🚀💪`,
+          text: `👋🔥 Hey — still with me, legend?! 💎 I see you vibing with the slots and I RESPECT that energy! ✨ Just HOLDING this ${featuredSlot?.day} ${featuredSlot?.time} at ${featuredSlot?.location} slot warm for you — no pressure, all patience! 🫂🔒⏰ Only ${featuredSlot?.spotsLeft} spots remain and momentum is MOVING! 🚀💪`,
         });
         setMemory(m => ({ ...m, hesitations: m.hesitations + 1 }));
         hasShownIdleNudgeRef.current = true;
+        setState(prev => ({ ...prev, idleStrikes: 1 }));
       }
     }, 45000) as unknown as number;
-    return () => {
-      if (idleTimerRef.current) window.clearTimeout(idleTimerRef.current);
-    };
+
+    // STRIKE 2: 3m value reminder
+    strike2TimerRef.current = window.setTimeout(() => {
+      if (hasEscalatedRef.current) return;
+      if (Date.now() - lastActivityAt < 175000) return;
+      const featuredSlot = lastOfferedSlots[0] || slots[0];
+      const artName = featuredSlot?.art ?? 'class';
+      pushBot({
+        kind: 'drop-off-save',
+        text: `💎✨ Btw — every single beginner who walked into that ${artName} class told me they were nervous too… and left feeling like LITERAL SUPERHEROES! 🦸‍♂️🔥 Just wanted you to know there's a WHOLE tribe of warriors who stood EXACTLY where you are right now. 🫂💪 The mat's still waiting — zero judgment, pure welcome! 🥋🌟`,
+      });
+      setMemory(m => ({ ...m, hesitations: m.hesitations + 1 }));
+      setState(prev => ({ ...prev, idleStrikes: 2 }));
+    }, 180000) as unknown as number;
+
+    // STRIKE 3: 5m scarcity + silent escalation (hot leads only)
+    strike3TimerRef.current = window.setTimeout(() => {
+      if (hasEscalatedRef.current) return;
+      if (Date.now() - lastActivityAt < 295000) return;
+      const featuredSlot = lastOfferedSlots[0] || slots[0];
+      pushBot({
+        kind: 'drop-off-save',
+        text: `⏰🚨💎 LAST call on ${featuredSlot?.day} at ${featuredSlot?.time}, champion! 🔥 Since you're clearly a high-signal lead, I'm flagging this for Carlos to text you a direct booking link in case you got pulled into life. 📲✨ NO pressure, just options — you pick your own adventure! 🎯 Want me to queue that human handoff?! 👑`,
+        quickReplies: ['Yes, text me the link', 'Keep me in chat', 'Book right now'],
+      });
+      setState(prev => ({ ...prev, idleStrikes: 3 }));
+      if (state.hotLead) {
+        // Silent escalation trigger for hot leads
+        setState(prev => ({ ...prev, humanShadowActive: true }));
+      }
+    }, 300000) as unknown as number;
+
+    return clearAll;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.step, lastActivityAt, lastOfferedSlots, slots]);
+  }, [entities, lastActivityAt, lastOfferedSlots, memory.hesitations, memory.lastUserMessage, slots, state.hotLead, state.matTourShown, state.step]);
 
   useEffect(() => {
     const onVisibilityChange = () => {
@@ -830,6 +1998,56 @@ export default function LiveBookingBot() {
     return () => document.removeEventListener('visibilitychange', onVisibilityChange);
   }, [lastOfferedSlots, state.step]);
 
+  /* ─── B2: Real-time social proof activity feed (inject live events every 28-46s while on schedule step) ─── */
+  useEffect(() => {
+    if (state.step !== 'schedule' && state.step !== 'qualify-exp' && state.step !== 'micro-day-pref' && state.step !== 'micro-time-pref') {
+      if (liveActivityTimerRef.current) window.clearTimeout(liveActivityTimerRef.current);
+      return;
+    }
+    if (hasEscalatedRef.current) return;
+
+    const scheduleNext = () => {
+      const wait = 28000 + Math.random() * 18000;
+      liveActivityTimerRef.current = window.setTimeout(() => {
+        if (hasEscalatedRef.current) return;
+        if (state.step === 'post-booking' || state.step === 'escalate') return;
+        // Pick a random live-activity template
+        const featuredSlot = lastOfferedSlots[0] || slots[Math.floor(Math.random() * slots.length)];
+        const kind: 'booking' | 'viewing' | 'arriving' = Math.random() < 0.5 ? 'booking' : Math.random() < 0.7 ? 'viewing' : 'arriving';
+        const templates = LIVE_ACTIVITY_TEMPLATES[kind];
+        let text = templates[Math.floor(Math.random() * templates.length)];
+        text = text
+          .replace('{nbhd}', featuredSlot?.location ?? 'North Park')
+          .replace('{day}', featuredSlot?.day ?? 'Tue')
+          .replace('{time}', featuredSlot?.time ?? '6:30 PM')
+          .replace('{art}', featuredSlot?.art ?? 'BJJ')
+          .replace('{count}', String(3 + Math.floor(Math.random() * 6)))
+          .replace('{adjective}', NBHD_ADJECTIVES[Math.floor(Math.random() * NBHD_ADJECTIVES.length)])
+          .replace('{archetype}', ['nervous beginner', 'eager athlete', 'focused parent'][Math.floor(Math.random() * 3)]);
+        pushBot({
+          kind: 'live-activity',
+          text,
+          liveActivityKind: kind,
+        });
+        setState(prev => ({ ...prev, liveActivityTicks: prev.liveActivityTicks + 1 }));
+        scheduleNext();
+      }, wait) as unknown as number;
+    };
+    scheduleNext();
+
+    return () => {
+      if (liveActivityTimerRef.current) window.clearTimeout(liveActivityTimerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.step, lastOfferedSlots, slots]);
+
+  /* ─── D6: Post-booking nurture checkpoint timers (cleanup on unmount) ─── */
+  useEffect(() => {
+    return () => {
+      nurtureTimerRefs.current.forEach(t => window.clearTimeout(t));
+    };
+  }, []);
+
   /* ─── Message factories ─── */
   const pushBot = useCallback((opts: Omit<ChatMessage, 'id' | 'sender'>) => {
     setMessages(prev => [...prev, { id: nextId.current++, sender: 'bot', ...opts }]);
@@ -845,7 +2063,29 @@ export default function LiveBookingBot() {
 
   const recentMessages = useMemo(() => messages.slice(-3), [messages]);
 
-  const resolveLocationSignal = useCallback((location: SDNeighborhood, source: GeoStatus, distance?: number) => {
+  const getMatchedSlots = useCallback((
+    ents: Entities,
+    memoryOverride: MemoryLayer = memory,
+    calendarSharedOverride: boolean = state.calendarShared
+  ) => {
+    const baseMatches = matchSlots(ents, slots, memoryOverride, {
+      weekdayIdx: clock.weekdayIdx,
+      hour24: clock.hour24,
+    });
+
+    if (!calendarSharedOverride) {
+      return { matched: baseMatches, conflictsRemoved: 0 };
+    }
+
+    const busySlotIds = getDemoCalendarBusySlotIds(baseMatches, ents, sessionIdRef.current);
+    const filtered = baseMatches.filter(slot => !busySlotIds.has(slot.id));
+    return {
+      matched: filtered.length > 0 ? filtered : baseMatches,
+      conflictsRemoved: Math.max(0, baseMatches.length - filtered.length),
+    };
+  }, [clock.hour24, clock.weekdayIdx, memory, slots, state.calendarShared]);
+
+  const resolveLocationSignal = useCallback((location: SDNeighborhood, source: GeoStatus, distance?: number, userCoords?: { lat: number; lng: number }) => {
     setEntities(prev => ({ ...prev, location, travelMode: distance && distance > 80 ? 'visitor' : (prev.travelMode || 'local') }));
     setGeoStatus(source);
 
@@ -865,11 +2105,27 @@ export default function LiveBookingBot() {
       return;
     }
 
+    // B5: 1-mile hyper-local "Local Legend" offer
+    if (userCoords && !state.neighborhoodOfferShown) {
+      const offer = computeNeighborhoodOffer(userCoords.lat, userCoords.lng);
+      if (offer && offer.distanceMi <= 1.0) {
+        const walkMin = Math.max(2, Math.round(offer.distanceMi * 20));
+        pushBot({
+          kind: 'neighborhood-offer',
+          text: `🔥🏆🎉 OKAY WAIT — you are LITERALLY a ${walkMin}-minute walk from our ${offer.dojo} dojo!! 🚶✨💎 Because you're a NEIGHBOR, I am UNLOCKING our exclusive "Local Legend" rate — FIRST MONTH ${offer.discount}% OFF, zero strings, zero tricks, just neighborhood energy! 🎁👑 This is a hyper-local perk we DO NOT publish anywhere! 🤫 Want me to HOLD that rate for you right NOW?! 🔒⚡`,
+          neighborhoodOffer: offer,
+          quickReplies: ['🔥 HOLD the Local Legend rate!', 'Tell me more first', 'Show slots without the discount'],
+        });
+        setState(prev => ({ ...prev, neighborhoodOfferShown: true }));
+        return;
+      }
+    }
+
     pushBot({
       kind: 'text',
       text: `📍🔥💥 BOOM — ${location} is DIALED IN and honestly? It's the CROWN JEWEL of our whole San Diego empire! 🏆👑✨ I'm locking that in right now and pulling up the MOST ELITE schedule the universe has ever seen — curated JUST for you! 🌟🎯 The mats in ${location} have been waiting for a warrior exactly like you! 💪🥋⚡ Let's GOOOO! 🚀🔥`,
     });
-  }, [entities, memory, pushBot, recentMessages]);
+  }, [entities, memory, pushBot, recentMessages, state.neighborhoodOfferShown]);
 
   const requestPreciseLocation = useCallback(() => {
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
@@ -889,7 +2145,8 @@ export default function LiveBookingBot() {
         resolveLocationSignal(
           nearest.neighborhood,
           nearest.distance > 80 ? 'non-local' : 'shared',
-          nearest.distance
+          nearest.distance,
+          { lat: position.coords.latitude, lng: position.coords.longitude }
         );
       },
       () => {
@@ -939,6 +2196,22 @@ export default function LiveBookingBot() {
       return;
     }
 
+    // B1: Calendar availability share
+    if (/share.*availability|share.*calendar|calendar.*share|connect.*calendar/i.test(text)) {
+      handleCalendarShare();
+      return;
+    }
+
+    // B5: Local Legend offer acceptance
+    if (/hold.*local legend|local legend.*rate|yes.*local legend/i.test(text)) {
+      pushBot({
+        kind: 'text',
+        text: `🔒🔥💎 LOCKED IN!! Local Legend rate is OFFICIALLY held in your name for 48 hours — Carlos flagged it and everything! 👑✨ Now let's get you on the mat — pulling your neighborhood-optimized slots RIGHT NOW! 🥋⚡🚀`,
+      });
+      window.setTimeout(() => offerSlots({ ...entities }), 900);
+      return;
+    }
+
     if (/show weekend traveler slots/i.test(text)) {
       const visitorEntities: Entities = { ...entities, travelMode: 'visitor', preferredDay: 'weekend' };
       setEntities(visitorEntities);
@@ -967,26 +2240,42 @@ export default function LiveBookingBot() {
 
     const sentAt = performance.now();
 
-    // Score intents + sentiment
-    const intents = scoreIntents(text);
+    // D1: user-pace mirror — measure time between last bot message and this user reply
+    const userReplyMs = Math.max(300, Date.now() - lastBotSentAtRef.current);
+
+    // Score intents + apply learned patterns (D5)
+    const rawIntents = scoreIntents(text);
+    const intents = applyLearnedIntents(text, rawIntents);
     const topIntent = intents[0];
     const sentiment = detectSentiment(text);
 
     // Extract entities
     const newEntities = extractEntities(text, entities);
     const gainedEntity = Object.keys(newEntities).length > Object.keys(entities).length;
-    const nextMemory = deriveNextMemory(memory, text, topIntent, gainedEntity);
-    const nextState = deriveNextState(state, topIntent);
+    const nextMemory = deriveNextMemory(memory, text, topIntent, gainedEntity, responseTimes, userReplyMs);
+
+    // D3: Archetype detection (lock in after message 3, don't flip)
+    let nextState = deriveNextState(state, topIntent);
+    if (!nextState.archetype && nextMemory.messageCount >= 3) {
+      const detected = detectArchetype(newEntities, nextMemory);
+      if (detected) nextState = { ...nextState, archetype: detected };
+    }
+
+    // A5: update conversion readiness now that state is derived
+    nextMemory.conversionReadiness = computeConversionReadiness(nextState, nextMemory, newEntities);
 
     setMemory(nextMemory);
     setEntities(newEntities);
     setState(nextState);
 
-    // Compute typing delay using previous bot message
+    // B3 + D1 + D3: adaptive delay (sentiment + archetype + user-pace mirror)
     const prevBot = [...messages].reverse().find(m => m.sender === 'bot');
-    const delay = calculateTypingDelay(
+    const delay = computeAdaptiveDelay(
       prevBot?.text || '',
-      predictResponseKind(topIntent, sentiment, nextMemory, newEntities)
+      predictResponseKind(topIntent, sentiment, nextMemory, newEntities),
+      sentiment,
+      nextState.archetype,
+      nextMemory.userResponseTimesMs
     );
 
     window.setTimeout(() => {
@@ -994,8 +2283,18 @@ export default function LiveBookingBot() {
       setResponseTimes(r => [...r, responseMs]);
       respond(text, topIntent, intents, sentiment, newEntities, nextMemory, nextState);
       setThinking(false);
+      lastBotSentAtRef.current = Date.now();
     }, delay);
   };
+
+  /* ─── B1: Calendar share simulated flow ─── */
+  const handleCalendarShare = useCallback(() => {
+    pushBot({
+      kind: 'calendar-share',
+      text: `📅✨💎 OKAY watch this magic — I'm about to cross-reference your free/busy calendar with our LIVE schedule and serve you slots that WILL NOT CLASH with your real life! 🔮🎯 I only see free/busy (zero event details, zero creeping 🫡), and in 2 seconds you get a schedule that's been PERSONALLY bent around your week! 🌟`,
+      quickReplies: ['📅 Connect Google Calendar', '📅 Connect Outlook', '🙅 Skip — show me anyway'],
+    });
+  }, [pushBot]);
 
   /* ─── Responder: the brain ─── */
   const respond = (
@@ -1010,6 +2309,47 @@ export default function LiveBookingBot() {
     // Post-booking owns its own lane — never re-escalate a closed deal
     if (currentState.step === 'post-booking') {
       handlePostBookingResponse(userText, currentState.bookedSlot);
+      return;
+    }
+
+    // Calendar connect flow (B1)
+    if (/connect google calendar|connect outlook|skip.*show me anyway/i.test(userText)) {
+      const shouldUseCalendar = !/skip/i.test(userText);
+      setState(prev => ({ ...prev, calendarShared: shouldUseCalendar }));
+      if (!shouldUseCalendar) {
+        pushBot({
+          kind: 'text',
+          text: `⚡✨ All good, legend — firing up the schedule without the sync! 🎯 Pulling your hyper-personalized slots NOW! 🚀🔥`,
+        });
+      } else {
+        pushBot({
+          kind: 'text',
+          text: `✅💎 CALENDAR SYNCED (demo mode: cross-checking 14 events from your calendar)! 📅✨ Found your FREE windows — serving ONLY slots that clash with ZERO of your existing commitments! 🔒🎯🔥`,
+        });
+      }
+      window.setTimeout(() => offerSlots(newEntities, { calendarShared: shouldUseCalendar, memoryOverride: currentMemory }), 1100);
+      return;
+    }
+
+    // D2: Cycle break — objection loop detected, interrupt with transparency
+    if (currentMemory.cycleCount >= 1 && !currentState.cycleBreakShown) {
+      pushBot({
+        kind: 'cycle-breaker',
+        text: `🔥💎 OKAY — I see the loop we're in and I refuse to keep you spinning! 🛑✨ Let me cut RIGHT through it: here is the 45-second "No-BS Transparency Packet" Carlos personally recorded for people EXACTLY where you are right now 🎥👑:\n\n1️⃣ Trial = 100% free, zero card on file ever! 🆓\n2️⃣ Zero live sparring for 3 weeks — drill-only, full safety 🛡️\n3️⃣ Month-to-month, cancel ANY day, no pressure 🔓\n4️⃣ Every concern you've raised is pre-flagged for Carlos — he'll address them BEFORE you even ask 🎯\n\nNo more back-and-forth, just receipts. Want me to show slots or connect you to Carlos right now?! 🤝💥`,
+        quickReplies: ['Show me slots now', 'Connect me to Carlos', 'One more question'],
+      });
+      setState(prev => ({ ...prev, cycleBreakShown: true }));
+      return;
+    }
+
+    // C4: Drop-off preemptive intervention
+    if (currentMemory.dropOffRisk >= 0.6 && !currentState.dropOffSaveShown && currentState.step !== 'escalate') {
+      pushBot({
+        kind: 'drop-off-save',
+        text: `🫂💎 Hey — I can tell this might feel like a lot. Want me to SIMPLIFY this down to 1 PERFECT option in like 10 seconds?! ⚡✨ No pressure, no sales pitch, just the single best-fit slot I'd recommend for someone with your exact profile! 🎯🔥 Just say "pick for me" and I'll make it DEAD simple! 🙌`,
+        quickReplies: ['Pick for me', 'Show me all options', 'Talk to a human'],
+      });
+      setState(prev => ({ ...prev, dropOffSaveShown: true }));
       return;
     }
 
@@ -1048,19 +2388,59 @@ export default function LiveBookingBot() {
       return;
     }
 
-    if (/show me slots/i.test(userText) && (newEntities.art || entities.art)) {
-      offerSlots({ ...entities, ...newEntities });
+    if (/bring in carlos|talk to carlos|connect me to carlos|text me the link/i.test(userText)) {
+      triggerEscalation('User explicitly requested Carlos / a direct link.', {
+        ents: newEntities,
+        mem: currentMemory,
+        convo: currentState,
+      });
+      return;
+    }
+
+    if (/show the best slot|show me that slot|gentle beginner option|beginner-friendly one/i.test(userText)) {
+      const curated = getMatchedSlots(
+        /beginner/i.test(userText) ? { ...newEntities, experience: 'Beginner' } : newEntities,
+        currentMemory
+      ).matched;
+      if (curated.length > 0) {
+        pushBot({
+          kind: 'schedule',
+          text: `🎯💎 Here is the SINGLE cleanest fit I'd put my own name behind right now — lowest friction, highest show-up odds, all killer no filler. 🔥`,
+          scheduleSlots: curated.slice(0, 1),
+        });
+        setLastOfferedSlots(curated.slice(0, 1));
+        setState(prev => ({ ...prev, step: 'schedule' }));
+      }
+      return;
+    }
+
+    if (/show the shortlist|show all nearby options|prioritize the closest dojo|show all options/i.test(userText)) {
+      offerSlots(newEntities, { memoryOverride: currentMemory });
+      return;
+    }
+
+    if (/keep me in chat/i.test(userText)) {
+      pushBot({
+        kind: 'text',
+        text: "💬💎🔥 BEAUTIFUL choice — staying in chat mode like true warriors do! 🏆✨ No handoff, no rush, ZERO pressure — I'll keep the schedule warm, keep the energy IMMACULATE, and keep guiding you until this feels as effortless as breathing! 🥋⚡ I'm here for as long as you need me, legend! 💪👑🚀",
+      });
+      return;
+    }
+
+    if (/show.*slots/i.test(userText) && (newEntities.art || entities.art)) {
+      offerSlots({ ...entities, ...newEntities }, { memoryOverride: currentMemory });
       return;
     }
 
     // Returning visitor quick paths
     if (isReturning && /continue|yes/i.test(userText) && (entities.art || newEntities.art)) {
       const remembered = { ...entities, ...newEntities };
+      const rememberedMatches = getMatchedSlots(remembered, currentMemory).matched;
       pushBot({
         kind: 'text',
-        text: `🔥💎 YESSSS — we are PICKING UP EXACTLY where destiny left us! ✨👑 I remember EVERYTHING about you like it was burned into my circuits: ${remembered.art}${remembered.experience ? ', ' + remembered.experience.toLowerCase() + ' warrior' : ''}${remembered.audienceType === 'parent' ? `, proud parent of a future champion` : ''}! 🧠💪 I've got ${matchSlots(remembered, slots).length} ELITE, laser-tailored slots waiting for you RIGHT NOW and they are ABSOLUTELY PERFECT! 🎯🏆 Let's GO! 🚀🥋`,
+        text: `🔥💎 YESSSS — we are PICKING UP EXACTLY where destiny left us! ✨👑 I remember EVERYTHING about you like it was burned into my circuits: ${remembered.art}${remembered.experience ? ', ' + remembered.experience.toLowerCase() + ' warrior' : ''}${remembered.audienceType === 'parent' ? `, proud parent of a future champion` : ''}! 🧠💪 I've got ${rememberedMatches.length} ELITE, laser-tailored slots waiting for you RIGHT NOW and they are ABSOLUTELY PERFECT! 🎯🏆 Let's GO! 🚀🥋`,
       });
-      window.setTimeout(() => offerSlots(remembered), 900);
+      window.setTimeout(() => offerSlots(remembered, { memoryOverride: currentMemory }), 900);
       setIsReturning(false);
       return;
     }
@@ -1068,6 +2448,46 @@ export default function LiveBookingBot() {
     const isMicroCommitmentReply =
       (currentState.step === 'micro-day-pref' && /weekday|weekend|either/i.test(userText))
       || (currentState.step === 'micro-time-pref' && /evening|morning|earlier|either/i.test(userText));
+
+    // Drop-off save acceptance
+    if (/^pick for me/i.test(userText)) {
+      const best = getMatchedSlots(newEntities, currentMemory).matched;
+      if (best.length > 0) {
+        pushBot({
+          kind: 'text',
+          text: `🎯💎🔥 DONE — based on EVERYTHING you've told me, THIS is your perfect slot:\n\n📍 ${best[0].label} · ${best[0].day} ${best[0].time} at ${best[0].location}\n\n✨ Tap to lock it in or say "different one" and I'll swap! 🚀`,
+          scheduleSlots: best.slice(0, 1),
+        });
+        pushBot({ kind: 'schedule', text: '', scheduleSlots: best.slice(0, 1) });
+      }
+      return;
+    }
+
+    // A4: Arbitration — check if we should do parallel / preempt / book / clarify / answer
+    const arbitration = arbitrateIntent(allIntents, currentMemory, currentState, newEntities);
+
+    // C5: Parallel multi-intent answer (answer ALL top intents + advance funnel)
+    if (arbitration === 'parallel' && allIntents.length >= 2) {
+      const top2 = allIntents.slice(0, 2);
+      const answers: string[] = [];
+      for (const it of top2) {
+        if (it.intent === 'objection:price') answers.push('💰🔥 On pricing — your FIRST class is 100% FREE (zero card, zero tricks!), then it\'s month-to-month with ZERO lock-in contracts EVER! 💎 No gym-bro upsells, just pure warrior value! 🏆');
+        else if (it.intent === 'objection:safety') answers.push('🛡️✨ On safety — 3-week drill-only onboarding with tap-first culture, ZERO concussions in 18 months running, and certified instructors who breathe safety! 💪🔥 Your wellbeing is our RELIGION! 🙌');
+        else if (it.intent === 'objection:wear') answers.push('👕💎 On outfits — regular gym clothes on day 1 (literally whatever you\'re comfy in!), FREE loaner gi from the front desk like VIP treatment! 🎁✨ Zero wardrobe stress! 🥋');
+        else if (it.intent === 'objection:time') answers.push('⏰🔥 On time — morning, lunch, AND evening slots DAILY across 4 SD neighborhoods! ☀️🌙 Most members train just 2×/week and the results are INSANE! 💪⚡ We flex around YOUR life! 🎯');
+        else if (it.intent === 'objection:insurance') answers.push('📋💎 On insurance — FULL commercial coverage, professional liability waiver on file, month-to-month contracts, and we run this like a WORLD-CLASS operation because that\'s what you DESERVE! 🏆✨🛡️');
+        else if (it.intent === 'objection:kid-safety') answers.push('👶🔥 On kid safety — unreal 6:1 ratio, EVERY coach background-checked, 400+ kids trained with ZERO serious injuries! 🛡️💎 Parents watch from the benches and most end up wanting to sign up THEMSELVES! 😂✨');
+        else if (it.intent.startsWith('art:')) answers.push(`🥋🔥 On ${it.intent.split(':')[1]} — multiple ELITE classes per week across 4 San Diego neighborhoods, beginner-friendly entry points, and coaches who are LEGENDS in their discipline! 💎⚡ This is world-class training! 🏆`);
+      }
+      if (answers.length >= 2) {
+        pushBot({
+          kind: 'parallel-answer',
+          text: `🎯💎🔥 BOOM — hitting BOTH of these in ONE shot because you deserve efficiency, not bot-theater! ⚡\n\n${answers.join('\n\n')}\n\n✨ Now — ready to see the slots matched to YOUR exact vibe?! 🥋🚀`,
+          quickReplies: ['Yes, show me slots', 'One more question'],
+        });
+        return;
+      }
+    }
 
     // Low confidence / tied intents → clarification ladder
     if ((!topIntent || topIntent.confidence < 0.35) && !isMicroCommitmentReply) {
@@ -1139,7 +2559,7 @@ export default function LiveBookingBot() {
         kind: 'text',
         text: `${preferredTime === 'evening' ? '🌙🔥 EVENINGS — YESSS, the prime warrior hours!!' : preferredTime === 'morning' ? '🌅⚡ EARLY BIRD CHAMPION — I am OBSESSED with that dedication!!' : '✨🎯 FLEXIBLE — total pro move, maximum opportunity!!'} — LOCKED IN! 💎 Hold tight for ONE sec while I pull your hyper-personalized, destiny-matched slots… 🔍💪⚡`,
       });
-      window.setTimeout(() => offerSlots(updatedEntities), 900);
+      window.setTimeout(() => offerSlots(updatedEntities, { memoryOverride: currentMemory }), 900);
       return;
     }
 
@@ -1198,7 +2618,7 @@ export default function LiveBookingBot() {
       if (!currentMemory.objections.includes('kid-safety')) {
         window.setTimeout(() => injectMicroproof('kid-safety'), 1000);
       }
-      offerSlotsDelayed({ ...newEntities, audienceType: 'parent', art: 'Kids' }, 1800);
+      offerSlotsDelayed({ ...newEntities, audienceType: 'parent', art: 'Kids' }, 1800, { memoryOverride: currentMemory });
       setState(prev => ({ ...prev, step: 'schedule' }));
       return;
     }
@@ -1248,9 +2668,9 @@ export default function LiveBookingBot() {
             preemptedObjections: [...prev.preemptedObjections, 'safety'],
           }));
         }, 900);
-        window.setTimeout(() => offerSlots({ ...newEntities, experience: exp }), 2400);
+        window.setTimeout(() => offerSlots({ ...newEntities, experience: exp }, { memoryOverride: currentMemory }), 2400);
       } else {
-        window.setTimeout(() => offerSlots({ ...newEntities, experience: exp }), 800);
+        window.setTimeout(() => offerSlots({ ...newEntities, experience: exp }, { memoryOverride: currentMemory }), 800);
       }
       setState(prev => ({ ...prev, step: 'schedule' }));
       return;
@@ -1275,7 +2695,7 @@ export default function LiveBookingBot() {
       }
       // Skip redundant questions if we already know
       if (newEntities.art && newEntities.experience) {
-        offerSlots(newEntities);
+        offerSlots(newEntities, { memoryOverride: currentMemory });
         setState(prev => ({ ...prev, step: 'schedule' }));
         return;
       }
@@ -1348,7 +2768,7 @@ export default function LiveBookingBot() {
         kind: 'text',
         text: `${preferredTime === 'evening' ? '🌙🔥 EVENINGS — YESSS, the prime warrior hours!!' : preferredTime === 'morning' ? '🌅⚡ EARLY BIRD CHAMPION — I am OBSESSED with that dedication!!' : '✨🎯 FLEXIBLE — total pro move, maximum opportunity!!'} — LOCKED IN! 💎 Hold tight for ONE sec while I pull your hyper-personalized, destiny-matched slots… 🔍💪⚡`,
       });
-      window.setTimeout(() => offerSlots(updatedEntities), 900);
+      window.setTimeout(() => offerSlots(updatedEntities, { memoryOverride: currentMemory }), 900);
       return;
     }
 
@@ -1372,7 +2792,7 @@ export default function LiveBookingBot() {
         return;
       }
       pushBot({ kind: 'text', text: `${pref === 'weekend' ? '🏖️🔥 WEEKENDS — the CHAMPION hours!!' : pref === 'evening' ? '🌙💎 EVENINGS — prime warrior time!!' : '🌅⚡ MORNINGS — the grinder mentality, LOVE IT!!'} — LOCKED IN! 💎 Pulling your destiny-matched slots RIGHT NOW… 🔍💪⚡` });
-      window.setTimeout(() => offerSlots({ ...newEntities, preferredTime: pref }), 900);
+      window.setTimeout(() => offerSlots({ ...newEntities, preferredTime: pref }, { memoryOverride: currentMemory }), 900);
       return;
     }
 
@@ -1411,7 +2831,7 @@ export default function LiveBookingBot() {
         kind: 'text',
         text: `📍🔥💎 ${newEntities.location} — OH, we have a LEGENDARY location RIGHT in your backyard! 🏆✨ Pulling up the absolute closest slots for you at warp speed… 🚀⚡🥋`,
       });
-      window.setTimeout(() => offerSlots(newEntities), 800);
+      window.setTimeout(() => offerSlots(newEntities, { memoryOverride: currentMemory }), 800);
       return;
     }
 
@@ -1427,11 +2847,32 @@ export default function LiveBookingBot() {
     decisionState: ConversationState
   ) => {
     switch (move) {
+      case 'greet':
+        pushBot({
+          kind: 'quick-replies',
+          text: "👋🔥 LET'S make this insanely easy, legend — tell me whether you're looking for you, your kid, or just the best beginner path and I'll take it from there like a missile! 🎯💎",
+          quickReplies: getSmartReplies({
+            step: 'greeting',
+            entities: ents,
+            memory: decisionMemory,
+            recentMessages,
+            geoStatus,
+            fallback: ['Adult trial', 'Kid trial', 'Best beginner option'],
+          }),
+        });
+        return;
+      case 'clarify':
+        pushBot({
+          kind: 'clarify',
+          text: "🧠💎🔥 OKAY I'm picking up MULTIPLE champion-tier signals from you and my brain is VIBRATING with options! ⚡✨ But I refuse to spray-and-pray — I wanna SNIPE the exact thing that unlocks YOUR path! 🎯🏆 Quick gut-check: are we talking trial booking, calming those warrior nerves, dialing in the perfect schedule, or getting crystal-clear on the investment?! 💪🥋 Tap your vibe! 🚀",
+          quickReplies: ['Book my trial', 'Beginner nerves', 'Schedule fit', 'Pricing clarity'],
+        });
+        return;
       case 'escalate':
         triggerEscalation('Best-move recommender chose escalation.', { ents, mem: decisionMemory, convo: decisionState });
         return;
       case 'offer-slots':
-        offerSlots(ents);
+        offerSlots(ents, { memoryOverride: decisionMemory });
         return;
       case 'close':
         pushBot({
@@ -1447,6 +2888,33 @@ export default function LiveBookingBot() {
           }),
         });
         return;
+      case 'momentum-lock': {
+        if (!ents.preferredDay) {
+          pushBot({
+            kind: 'momentum-lock',
+            text: "⚡🔒💎 MOMENTUM LOCK = FULLY ENGAGED!! 🔥🚀 Here's the play: one tiny YES at a time and we're gonna make this booking feel as INEVITABLE as gravity! 🏆✨ First micro-commitment — what kind of days feel EASIEST for you to actually show up and ABSOLUTELY DOMINATE?! 💪🥋 Tap that warrior instinct! 👊",
+            quickReplies: ['Weekdays hit best', 'Weekends are cleaner', 'Either works'],
+          });
+          setState(prev => ({ ...prev, step: 'micro-day-pref', momentumLockActive: true }));
+          return;
+        }
+        if (!ents.preferredTime) {
+          pushBot({
+            kind: 'momentum-lock',
+            text: "🔥💎 BEAUTIFUL — that answer was CHEF'S KISS! 🍳✨ Next micro-yes: when does your WARRIOR ENERGY peak?! ⚡ I want the slot you'll actually LOVE walking into — not just the one that looks cute on paper! 🎯🏆 Morning grinder or evening legend?! 🌅🌙💪",
+            quickReplies: ['Evening after 5', 'Morning / earlier', 'Either is fine'],
+          });
+          setState(prev => ({ ...prev, step: 'micro-time-pref', momentumLockActive: true }));
+          return;
+        }
+        pushBot({
+          kind: 'momentum-lock',
+          text: "🔒💎🔥 GORGEOUS — you've already crushed the hard part and didn't even break a sweat! 🏆✨ Final micro-commitment before DESTINY unfolds: do you want me to serve the SINGLE absolute BEST-fit slot, or the full shortlist so you can pick like ROYALTY?! 👑⚡🥋 Either way, you are UNSTOPPABLE right now! 🚀💪",
+          quickReplies: ['Show the best slot', 'Show the shortlist', 'One more question'],
+        });
+        setState(prev => ({ ...prev, momentumLockActive: true }));
+        return;
+      }
       case 'preempt': {
         const next = predictNextObjection(ents, decisionMemory.objections);
         if (next) {
@@ -1468,6 +2936,61 @@ export default function LiveBookingBot() {
         }
         return;
       }
+      case 'story': {
+        const story = pickStoryForMoment(
+          decisionState.archetype,
+          decisionMemory.objections[decisionMemory.objections.length - 1],
+          decisionMemory.storiesShown
+        );
+        if (story) {
+          pushBot({
+            kind: 'story',
+            text: story.text,
+            storyTag: story.tag,
+          });
+          setMemory(prev => ({
+            ...prev,
+            storiesShown: [...prev.storiesShown, story.tag],
+            narrativeBeatsSent: prev.narrativeBeatsSent + 1,
+          }));
+          return;
+        }
+        offerSlots(ents, { memoryOverride: decisionMemory });
+        return;
+      }
+      case 'mat-tour':
+        pushBot({
+          kind: 'mat-tour',
+          text: "🎥💎🔥 MENTAL MAT TOUR incoming — because uncertainty DIES the second you can SEE yourself WINNING this first visit! ✨🥋 Close your eyes for 3 seconds and FEEL this movie play out scene by scene! 🎬⚡ This is what YOUR first class looks like at Pacific Coast: 🏆👑",
+          matTourScenes: buildMatTourScenes(lastOfferedSlots[0], ents),
+          quickReplies: ['Show me that slot', 'I want the gentle beginner option', 'Talk to Carlos'],
+        });
+        setState(prev => ({ ...prev, matTourShown: true }));
+        return;
+      case 'drop-off-save':
+        pushBot({
+          kind: 'drop-off-save',
+          text: "🫂💎🔥 HEY — I can FEEL the overthinking creeping in and I'm NOT letting it win! ✨🛡️ Here's what I can do for you RIGHT NOW: simplify EVERYTHING down to ONE single PERFECT option, or bring in Carlos for the elite human touch! 🏆👑 Either way, you do NOT have to do ANY more mental labor — I'll carry the weight from here like the CHAMPION concierge I was built to be! 💪⚡🥋 What sounds best?! 🚀",
+          quickReplies: ['Pick for me', 'Show all options', 'Bring in Carlos'],
+        });
+        setState(prev => ({ ...prev, dropOffSaveShown: true }));
+        return;
+      case 'cycle-break':
+        pushBot({
+          kind: 'cycle-breaker',
+          text: `🔥💎🛑 HOLD UP — I see the objection loop happening and I am NOT letting it eat your momentum! ⚡✨ Here's the CLEAN truth packet, zero fluff: 🆓 FREE trial with ZERO card on file! 🔓 No contract trap, month-to-month ALWAYS! 🛡️ Safety-first onboarding, drill-only for 3 weeks! 👑 Carlos is ALREADY briefed on your EXACT concerns! 🎯 That's the whole game, laid bare! Now — want the slots or the legendary human handoff?! 🏆🥋💪`,
+          quickReplies: ['Show me slots now', 'Connect me to Carlos', 'One more question'],
+        });
+        setState(prev => ({ ...prev, cycleBreakShown: true }));
+        return;
+      case 'neighborhood-offer':
+        pushBot({
+          kind: 'neighborhood-offer',
+          text: `🔥🏡💎 WHOA WHOA WHOA — I'm getting straight-up LOCAL LEGEND energy from your profile and I am TREATING you accordingly! 👑✨⚡ If you want, I'll prioritize the CLOSEST, easiest-to-show-up-for dojo and HOLD the cleanest starter slot there like a reserved throne! 🏆🥋 Neighbors get the VIP treatment around here — that's just how we roll in San Diego! 🌊💪🚀`,
+          quickReplies: ['Prioritize the closest dojo', 'Show all nearby options', 'Talk to Carlos'],
+        });
+        setState(prev => ({ ...prev, neighborhoodOfferShown: true }));
+        return;
       case 'microproof':
         injectMicroproof(decisionMemory.objections[decisionMemory.objections.length - 1] || 'price');
         return;
@@ -1503,6 +3026,17 @@ export default function LiveBookingBot() {
       kind: 'text',
       text: "🛡️💎🔥 100% HEARD and I am THRILLED you asked because safety is literally THE foundation we were built on! 🏗️🙏 We've trained over 3,000+ San Diego warriors of every background, and safety isn't an afterthought — it's WOVEN into every molecule of how we run the mat: ZERO live sparring until week 3, progressive drilling that builds mastery SAFELY, and certified instructors who have CHILD safety credentials! 👨‍🏫✨💪 This is serious stuff and we treat it with the respect it deserves! 🎯",
     });
+    if (!state.matTourShown && (ents.experience === 'Beginner' || memory.hesitations >= 1 || /nervous|scared|what to expect/i.test(memory.lastUserMessage))) {
+      window.setTimeout(() => {
+        pushBot({
+          kind: 'mat-tour',
+          text: "🎥💎 And because nervous brains LOVE inventing fake danger, here's the real-life first-class movie in your head so you know EXACTLY what happens when you walk in: ",
+          matTourScenes: buildMatTourScenes(lastOfferedSlots[0], ents),
+          quickReplies: ['Show me beginner slots', 'That actually helps', 'Talk to Carlos'],
+        });
+        setState(prev => ({ ...prev, matTourShown: true }));
+      }, 500);
+    }
     window.setTimeout(() => injectMicroproof(ents.audienceType === 'parent' ? 'kid-safety' : 'safety', ents), 900);
   };
 
@@ -1543,19 +3077,40 @@ export default function LiveBookingBot() {
   };
 
   const injectMicroproof = (kind: ObjectionKey | 'price' | 'kid-safety' | 'safety', _ents?: Entities) => {
-    const proofs: Record<string, { title: string; body: string; citation: string }> = {
-      'price':       { title: '💸💎🔥 Real-member receipts (no fluff!)', body: '73% of our members train 2×/week and their daily cost literally comes out to gym + one coffee — absolute STEAL! ☕ Zero contract lock-in, 100% month-to-month freedom! 🆓✨ This is elite pricing, no cap! 💯', citation: '📊 Internal 2025 member survey, n=412' },
-      'safety':      { title: '🛡️💪 The SAFETY RECEIPTS speak for themselves!', body: 'Over 18 straight months: ZERO concussions. 🙌 Only 2 minor sprains across ~9,400 training sessions — that is STATISTICALLY safer than recreational basketball! 🏀📉 Let that SINK IN! 🔥', citation: '📋 Pacific Coast Martial Arts incident log 2024–2025' },
-      'kid-safety':  { title: '👶🛡️💎 Kid-safety MICROPROOF (parents read this twice!)', body: 'Kids program = 6:1 coach ratio (basically elite private tutoring! 🎯), fully background-checked certified instructors 🧑‍🏫, trained 400+ San Diego kids over 3 years with ZERO serious injuries! 🙏✨ Parents watch EVERY class from the benches — full transparency always! 👀💯', citation: '📊 California martial arts parent survey 2024' },
-      'wear':        { title: '👕🙌 The first-class dress code (relax, you\'re fine!)', body: '80% of first-timers roll up in regular gym clothes — literally zero judgment! 💯 We\'ve got FREE loaner gis in every size at the front desk! 🎁 Just bring water + a towel and your warrior spirit! 💧🔥', citation: '✅ First-class onboarding checklist' },
-      'time':        { title: '⏱️🏆 The typical champion schedule!', body: 'MOST of our adult members train just 2×/week and feel HUGE improvements in 6–8 weeks flat! 📈💥 You do NOT need to live at the dojo to see life-changing results — efficiency is EVERYTHING! ⚡🎯', citation: '📊 Member progression study 2024' },
-      'insurance':   { title: '📋🛡️ Full legal coverage — zero vibe-killers!', body: 'Every member signs a standard waiver. We carry commercial liability insurance for every single mat session. 🏛️✨ Contracts are month-to-month, cancel anytime — absolute freedom! 🆓💯', citation: '📝 Standard enrollment agreement' },
-    };
-    const proof = proofs[kind] || proofs.price;
+    // B4/C1: A/B-tested variant picker (archetype + persona aware, performance-weighted)
+    const variant = pickRebuttalVariant(
+      kind as ObjectionKey,
+      state.archetype,
+      memory.persona,
+      rebuttalsShownRef.current
+    );
+    rebuttalsShownRef.current.push(variant.id);
+    activeVariantIdRef.current = variant.id;
+    logRebuttalShown(variant.id);
     pushBot({
       kind: 'microproof',
-      text: `${proof.title}\n${proof.body}\n— ${proof.citation}`,
+      text: `${variant.title}\n${variant.body}\n— ${variant.citation}`,
+      rebuttalVariantId: variant.id,
     });
+
+    // C3: 35% chance to follow with a narrative story for reinforcement
+    if (Math.random() < 0.35 && memory.narrativeBeatsSent < 3) {
+      const story = pickStoryForMoment(state.archetype, kind as ObjectionKey, memory.storiesShown);
+      if (story) {
+        window.setTimeout(() => {
+          pushBot({
+            kind: 'story',
+            text: story.text,
+            storyTag: story.tag,
+          });
+          setMemory(m => ({
+            ...m,
+            storiesShown: [...m.storiesShown, story.tag],
+            narrativeBeatsSent: m.narrativeBeatsSent + 1,
+          }));
+        }, 1400);
+      }
+    }
   };
 
   const handleEscalationPreference = (userText: string) => {
@@ -1577,7 +3132,7 @@ export default function LiveBookingBot() {
 
     pushBot({
       kind: 'text',
-      text: "🙌💎 NO problem AT ALL — I'll keep the context warm and toasty right here until Carlos rolls in like the legend he is! 🔥✨ You're in good hands! 🤝",
+      text: "🙌💎🔥 NO problem AT ALL, legend — I'll keep the context WARM and TOASTY right here until Carlos rolls in like the ABSOLUTE WARRIOR he is! 🏆✨⚡ You're in the BEST hands in all of San Diego — that's not hype, that's just FACTS! 🤝👑🥋 Anything else on your mind while we vibe?! 💪🚀",
     });
   };
 
@@ -1690,12 +3245,16 @@ export default function LiveBookingBot() {
   };
 
   /* ─── Slots ─── */
-  const offerSlotsDelayed = (ents: Entities, ms: number) => {
-    window.setTimeout(() => offerSlots(ents), ms);
+  const offerSlotsDelayed = (ents: Entities, ms: number, opts?: { calendarShared?: boolean; memoryOverride?: MemoryLayer }) => {
+    window.setTimeout(() => offerSlots(ents, opts), ms);
   };
 
-  const offerSlots = (ents: Entities) => {
-    const matched = matchSlots(ents, slots);
+  const offerSlots = (ents: Entities, opts?: { calendarShared?: boolean; memoryOverride?: MemoryLayer }) => {
+    const { matched, conflictsRemoved } = getMatchedSlots(
+      ents,
+      opts?.memoryOverride ?? memory,
+      opts?.calendarShared ?? state.calendarShared
+    );
     if (matched.length === 0) {
       pushBot({
         kind: 'text',
@@ -1705,9 +3264,10 @@ export default function LiveBookingBot() {
       return;
     }
     setLastOfferedSlots(matched);
+    const objectionResurface = buildResurfacedObjectionLine(opts?.memoryOverride ?? memory);
     pushBot({
       kind: 'schedule',
-      text: `🔥💎🎯 BOOM — here are ${matched.length} ELITE, hyper-personalized slots I curated JUST for you${ents.location ? ` (${ents.location} location up top like the VIP you are! 👑)` : ''}${ents.travelMode === 'visitor' ? ' with travel-friendly timing perfectly positioned! ✈️' : ''}! ✨🥋 Tap ANY of these bad boys to lock it in INSTANTLY! ⚡👊`,
+      text: `🔥💎🎯 BOOM — here are ${matched.length} ELITE, hyper-personalized slots I curated JUST for you${ents.location ? ` (${ents.location} location up top like the VIP you are! 👑)` : ''}${ents.travelMode === 'visitor' ? ' with travel-friendly timing perfectly positioned! ✈️' : ''}! ✨🥋${(opts?.calendarShared ?? state.calendarShared) ? `\n\n📅 Calendar-magic note: I already stripped out ${conflictsRemoved} time clash${conflictsRemoved === 1 ? '' : 'es'} from the board, so what you're seeing is CLEAN, real-life-compatible availability only. 🔮✅` : ''}${objectionResurface ? `\n\n${objectionResurface}` : ''}\n\nTap ANY of these bad boys to lock it in INSTANTLY! ⚡👊`,
       scheduleSlots: matched,
     });
     setState(prev => ({ ...prev, step: 'schedule' }));
@@ -1717,11 +3277,23 @@ export default function LiveBookingBot() {
     // Decrement capacity
     setSlots(prev => prev.map(s => s.id === slot.id ? { ...s, spotsLeft: Math.max(0, s.spotsLeft - 1) } : s));
 
+    // D5: Replay & learn from this successful conversation (weight 2.0 = booking = strong signal)
+    replayAndLearn(messages, 2.0);
+
+    // B4/C1: Log rebuttal outcome for active variant (booking = strongest positive signal)
+    if (activeVariantIdRef.current) {
+      logRebuttalOutcome(activeVariantIdRef.current, 'booking');
+      activeVariantIdRef.current = null;
+    }
+
+    // Determine primary booking reason for personalized nurture
+    const bookingReason = determineBookingReason(memory, entities, slot);
+
     const tldr = buildHandoffSummary(
       { ...entities },
       memory,
       slot,
-      { ...state, bookedSlot: slot, leadScore: 100, hotLead: true, step: 'post-booking' }
+      { ...state, bookedSlot: slot, leadScore: 100, hotLead: true, step: 'post-booking', bookingReason }
     );
 
     pushBot({
@@ -1730,13 +3302,13 @@ export default function LiveBookingBot() {
       tldr,
     });
 
-    setState(prev => ({ ...prev, bookedSlot: slot, step: 'post-booking', leadScore: 100, hotLead: true }));
+    setState(prev => ({ ...prev, bookedSlot: slot, step: 'post-booking', leadScore: 100, hotLead: true, bookingReason }));
 
     // Post-booking micro-commitment nurture loop
     window.setTimeout(() => {
       pushBot({
         kind: 'post-booking',
-        text: `🔥✨💎 Quick one while the hype is HIGH — while you count down to class, want me to BLESS you with a 60-second ${slot.art} warm-up video AND a fire PDF with the insider parking hacks for ${slot.location}?! 🎁🗺️ This is the concierge treatment, baby! 👑🙌`,
+        text: `🔥✨💎 Quick one while the hype is HIGH — ${buildBookingReasonNudge(bookingReason, slot)} Want me to BLESS you with a 60-second ${slot.art} warm-up video AND a fire PDF with the insider parking hacks for ${slot.location}?! 🎁🗺️ This is the concierge treatment, baby! 👑🙌`,
         quickReplies: getSmartReplies({
           step: 'post-booking',
           entities,
@@ -1747,6 +3319,23 @@ export default function LiveBookingBot() {
         }),
       });
     }, 1600);
+
+    // D6: Schedule nurture checkpoints (day-3 warm-up, day-1 parking, day-0 morning)
+    const checkpoints = scheduleNurtureCheckpoints(slot, clock.weekdayIdx, Date.now(), bookingReason);
+    nurtureTimerRefs.current.forEach(t => window.clearTimeout(t));
+    nurtureTimerRefs.current = [];
+    checkpoints.forEach(cp => {
+      const delay = Math.max(0, cp.fireAtMs - Date.now());
+      const t = window.setTimeout(() => {
+        pushBot({
+          kind: 'nurture-checkpoint',
+          text: cp.message,
+          nurtureTag: cp.tag,
+        });
+        setState(prev => ({ ...prev, lastNurtureTick: Date.now() }));
+      }, delay);
+      nurtureTimerRefs.current.push(t);
+    });
   };
 
   /* ─── Escalation + Human Shadow Mode ─── */
@@ -2054,10 +3643,16 @@ export default function LiveBookingBot() {
               <div className="space-y-1.5 text-[10px] font-mono">
                 <StatRow label="Mode" value={currentModeLabel} color={modeColor} />
                 <StatRow label="Lead score" value={`${state.leadScore}/100`} color={state.hotLead ? '#dc2626' : undefined} />
+                <StatRow label="Archetype" value={state.archetype || '—'} />
+                <StatRow label="Persona" value={memory.persona || '—'} />
                 <StatRow label="Objections" value={memory.objections.length ? memory.objections.join(', ') : '—'} />
                 <StatRow label="Preempted" value={state.preemptedObjections.length ? state.preemptedObjections.join(', ') : '—'} />
                 <StatRow label="Confidence" value={`${Math.round(memory.confidenceScore * 100)}%`} color={memory.confidenceScore < 0.5 ? '#dc2626' : undefined} />
                 <StatRow label="Hesitations" value={String(memory.hesitations)} />
+                <StatRow label="Readiness" value={`${Math.round(memory.conversionReadiness * 100)}%`} color={memory.conversionReadiness > 0.7 ? '#22c55e' : undefined} />
+                <StatRow label="Churn risk" value={`${Math.round(memory.churnRisk * 100)}%`} color={memory.churnRisk > 0.5 ? '#dc2626' : undefined} />
+                <StatRow label="Drop-off" value={`${Math.round(memory.dropOffRisk * 100)}%`} color={memory.dropOffRisk > 0.5 ? '#f97316' : undefined} />
+                <StatRow label="Booking reason" value={state.bookingReason || '—'} color={state.bookingReason ? '#22c55e' : undefined} />
                 <StatRow label="Step" value={state.step} />
               </div>
               {state.hotLead && (
@@ -2100,6 +3695,17 @@ function MessageBubble({
 }) {
   const isBot = message.sender === 'bot';
   const isHuman = message.sender === 'human';
+  const renderReplyButtons = (replies: string[] | undefined, className: string) => (
+    replies && replies.length > 0 ? (
+      <div className="mt-3 flex flex-wrap gap-2">
+        {replies.map(q => (
+          <button key={q} onClick={() => onQuickReply(q)} className={className}>
+            {q}
+          </button>
+        ))}
+      </div>
+    ) : null
+  );
 
   // Human shadow
   if (isHuman) {
@@ -2263,7 +3869,7 @@ function MessageBubble({
         <BotAvatar />
         <div className="flex-1 max-w-[95%]">
           {message.text && (
-            <div className="bg-dojo-carbon rounded-2xl rounded-bl-md px-4 py-3 mb-2 text-sm text-white">
+            <div className="bg-dojo-carbon rounded-2xl rounded-bl-md px-4 py-3 mb-2 text-sm text-white whitespace-pre-wrap">
               {message.text}
             </div>
           )}
@@ -2321,6 +3927,158 @@ function MessageBubble({
               </div>
             )}
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (message.kind === 'story') {
+    return (
+      <div className="flex gap-2">
+        <BotAvatar />
+        <div className="max-w-[85%] bg-fuchsia-500/5 border border-fuchsia-400/20 rounded-2xl rounded-bl-md p-4">
+          <div className="text-[10px] font-mono text-fuchsia-300 uppercase tracking-widest mb-2">📖✨ Story beat · Identity shift in motion</div>
+          <div className="text-sm text-white leading-relaxed whitespace-pre-wrap">{message.text}</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (message.kind === 'live-activity') {
+    const label = message.liveActivityKind === 'booking'
+      ? '⚡ Live booking pulse'
+      : message.liveActivityKind === 'viewing'
+        ? '👀 Live viewer pulse'
+        : '🥋 Live dojo pulse';
+    return (
+      <div className="flex gap-2">
+        <BotAvatar />
+        <div className="max-w-[85%] bg-white/5 border border-white/10 rounded-2xl rounded-bl-md px-4 py-3">
+          <div className="text-[9px] font-mono text-dojo-gold uppercase tracking-widest mb-2 animate-pulse">{label}</div>
+          <div className="text-sm text-white leading-relaxed">{message.text}</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (message.kind === 'calendar-share') {
+    return (
+      <div className="flex gap-2">
+        <BotAvatar />
+        <div className="flex-1 max-w-[85%]">
+          <div className="bg-cyan-500/5 border border-cyan-400/20 rounded-2xl rounded-bl-md p-4">
+            <div className="text-[10px] font-mono text-cyan-300 uppercase tracking-widest mb-2">📅✨ Predictive calendar sync</div>
+            <div className="text-sm text-white leading-relaxed whitespace-pre-wrap">{message.text}</div>
+            {renderReplyButtons(message.quickReplies, 'bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-400/30 text-white text-xs rounded-full px-3 py-1.5 transition-all')}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (message.kind === 'neighborhood-offer') {
+    return (
+      <div className="flex gap-2">
+        <BotAvatar />
+        <div className="flex-1 max-w-[85%]">
+          <div className="bg-gradient-to-br from-emerald-500/10 to-dojo-gold/5 border border-emerald-400/30 rounded-2xl rounded-bl-md p-4">
+            <div className="text-[10px] font-mono text-emerald-300 uppercase tracking-widest mb-2">🏡🔥 Local Legend unlock</div>
+            <div className="text-sm text-white leading-relaxed whitespace-pre-wrap">{message.text}</div>
+            {message.neighborhoodOffer && (
+              <div className="mt-3 grid grid-cols-3 gap-2 text-center text-[10px] font-mono uppercase tracking-widest">
+                <div className="rounded-lg bg-black/20 px-2 py-2 text-gray-300">{message.neighborhoodOffer.dojo}</div>
+                <div className="rounded-lg bg-black/20 px-2 py-2 text-gray-300">{message.neighborhoodOffer.distanceMi.toFixed(1)} mi</div>
+                <div className="rounded-lg bg-black/20 px-2 py-2 text-dojo-gold">{message.neighborhoodOffer.discount}% off</div>
+              </div>
+            )}
+            {renderReplyButtons(message.quickReplies, 'bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-400/30 text-white text-xs rounded-full px-3 py-1.5 transition-all')}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (message.kind === 'mat-tour') {
+    return (
+      <div className="flex gap-2">
+        <BotAvatar />
+        <div className="flex-1 max-w-[88%]">
+          <div className="bg-violet-500/5 border border-violet-400/20 rounded-2xl rounded-bl-md p-4">
+            <div className="text-[10px] font-mono text-violet-300 uppercase tracking-widest mb-2">🎥🥋 Mental mat tour</div>
+            <div className="text-sm text-white leading-relaxed whitespace-pre-wrap">{message.text}</div>
+            {message.matTourScenes && (
+              <div className="mt-3 space-y-2">
+                {message.matTourScenes.map(scene => (
+                  <div key={scene} className="rounded-xl bg-black/20 px-3 py-2 text-sm text-gray-200 leading-relaxed">
+                    {scene}
+                  </div>
+                ))}
+              </div>
+            )}
+            {renderReplyButtons(message.quickReplies, 'bg-violet-500/10 hover:bg-violet-500/20 border border-violet-400/30 text-white text-xs rounded-full px-3 py-1.5 transition-all')}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (message.kind === 'cycle-breaker') {
+    return (
+      <div className="flex gap-2">
+        <BotAvatar />
+        <div className="flex-1 max-w-[88%]">
+          <div className="bg-amber-500/5 border border-amber-300/30 rounded-2xl rounded-bl-md p-4">
+            <div className="text-[10px] font-mono text-amber-300 uppercase tracking-widest mb-2">🛑💎 Cycle breaker</div>
+            <div className="text-sm text-white leading-relaxed whitespace-pre-wrap">{message.text}</div>
+            {renderReplyButtons(message.quickReplies, 'bg-amber-500/10 hover:bg-amber-500/20 border border-amber-300/30 text-white text-xs rounded-full px-3 py-1.5 transition-all')}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (message.kind === 'momentum-lock' || message.kind === 'drop-off-save' || message.kind === 'parallel-answer') {
+    const badge = message.kind === 'momentum-lock'
+      ? '🔒⚡ Momentum lock'
+      : message.kind === 'drop-off-save'
+        ? '🫂✨ Save the drop-off'
+        : '🧠⚔️ Parallel answer';
+    const toneClass = message.kind === 'momentum-lock'
+      ? 'bg-dojo-red/10 hover:bg-dojo-red/20 border border-dojo-red/30 text-white text-xs rounded-full px-3 py-1.5 transition-all'
+      : message.kind === 'drop-off-save'
+        ? 'bg-blue-500/10 hover:bg-blue-500/20 border border-blue-400/30 text-white text-xs rounded-full px-3 py-1.5 transition-all'
+        : 'bg-dojo-gold/10 hover:bg-dojo-gold/20 border border-dojo-gold/30 text-white text-xs rounded-full px-3 py-1.5 transition-all';
+    const panelClass = message.kind === 'momentum-lock'
+      ? 'bg-dojo-red/5 border-dojo-red/20'
+      : message.kind === 'drop-off-save'
+        ? 'bg-blue-500/5 border-blue-400/20'
+        : 'bg-dojo-gold/5 border-dojo-gold/20';
+    return (
+      <div className="flex gap-2">
+        <BotAvatar />
+        <div className="flex-1 max-w-[88%]">
+          <div className={`border rounded-2xl rounded-bl-md p-4 ${panelClass}`}>
+            <div className="text-[10px] font-mono text-dojo-gold uppercase tracking-widest mb-2">{badge}</div>
+            <div className="text-sm text-white leading-relaxed whitespace-pre-wrap">{message.text}</div>
+            {renderReplyButtons(message.quickReplies, toneClass)}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (message.kind === 'nurture-checkpoint') {
+    const checkpointLabel = message.nurtureTag === 'day-minus-3'
+      ? '📹 T-3 nurture'
+      : message.nurtureTag === 'day-minus-1'
+        ? '🅿️ T-1 nurture'
+        : '🌅 Day-of nurture';
+    return (
+      <div className="flex gap-2">
+        <BotAvatar />
+        <div className="max-w-[85%] bg-dojo-gold/5 border border-dojo-gold/20 rounded-2xl rounded-bl-md p-4">
+          <div className="text-[10px] font-mono text-dojo-gold uppercase tracking-widest mb-2">{checkpointLabel}</div>
+          <div className="text-sm text-white leading-relaxed whitespace-pre-wrap">{message.text}</div>
         </div>
       </div>
     );
